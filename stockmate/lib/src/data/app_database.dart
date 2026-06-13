@@ -13,6 +13,12 @@ class Products extends Table {
   BoolColumn get isActive => boolean().withDefault(const Constant(true))();
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
   DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  List<String> get customConstraints => [
+        'CHECK (selling_price_minor >= 0)',
+        'CHECK (low_stock_threshold >= 0)',
+      ];
 }
 
 class ProductCodes extends Table {
@@ -34,6 +40,14 @@ class StockBatches extends Table {
   DateTimeColumn get receivedAt => dateTime().withDefault(currentDateAndTime)();
   TextColumn get note => text().nullable()();
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  List<String> get customConstraints => [
+        'CHECK (quantity_received >= 0)',
+        'CHECK (quantity_remaining >= 0)',
+        'CHECK (quantity_remaining <= quantity_received)',
+        'CHECK (cost_per_unit_minor >= 0)',
+      ];
 }
 
 class StockAdjustments extends Table {
@@ -60,6 +74,16 @@ class Sales extends Table {
   IntColumn get changeDueMinor => integer().nullable()();
   TextColumn get note => text().nullable()();
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  List<String> get customConstraints => [
+        'CHECK (subtotal_minor >= 0)',
+        'CHECK (discount_total_minor >= 0)',
+        'CHECK (total_minor >= 0)',
+        'CHECK (cost_total_minor >= 0)',
+        'CHECK (amount_paid_minor IS NULL OR amount_paid_minor >= 0)',
+        'CHECK (change_due_minor IS NULL OR change_due_minor >= 0)',
+      ];
 }
 
 class SaleLines extends Table {
@@ -73,6 +97,15 @@ class SaleLines extends Table {
   IntColumn get lineTotalMinor => integer()();
   IntColumn get costTotalMinor => integer()();
   IntColumn get grossProfitMinor => integer()();
+
+  @override
+  List<String> get customConstraints => [
+        'CHECK (quantity > 0)',
+        'CHECK (unit_price_minor >= 0)',
+        'CHECK (discount_amount_minor >= 0)',
+        'CHECK (line_total_minor >= 0)',
+        'CHECK (cost_total_minor >= 0)',
+      ];
 }
 
 class SaleLineBatchAllocations extends Table {
@@ -82,11 +115,18 @@ class SaleLineBatchAllocations extends Table {
   IntColumn get quantity => integer()();
   IntColumn get costPerUnitMinor => integer()();
   IntColumn get costTotalMinor => integer()();
+
+  @override
+  List<String> get customConstraints => [
+        'CHECK (quantity > 0)',
+        'CHECK (cost_per_unit_minor >= 0)',
+        'CHECK (cost_total_minor >= 0)',
+      ];
 }
 
 class Receipts extends Table {
   IntColumn get id => integer().autoIncrement()();
-  IntColumn get saleId => integer().references(Sales, #id)();
+  IntColumn get saleId => integer().references(Sales, #id).unique()();
   TextColumn get receiptNumber => text().unique()();
   TextColumn get pdfPath => text().nullable()();
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
@@ -113,4 +153,11 @@ class AppDatabase extends _$AppDatabase {
 
   @override
   int get schemaVersion => 1;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+        beforeOpen: (details) async {
+          await customStatement('PRAGMA foreign_keys = ON');
+        },
+      );
 }

@@ -3756,7 +3756,7 @@ class $ReceiptsTable extends Receipts with TableInfo<$ReceiptsTable, Receipt> {
     type: DriftSqlType.int,
     requiredDuringInsert: true,
     defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'REFERENCES sales (id)',
+      'UNIQUE REFERENCES sales (id)',
     ),
   );
   static const VerificationMeta _receiptNumberMeta = const VerificationMeta(
