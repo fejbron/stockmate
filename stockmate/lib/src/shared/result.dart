@@ -1,5 +1,7 @@
 sealed class AppResult<T> {
   const AppResult();
+
+  bool get isSuccess => this is AppSuccess<T>;
 }
 
 class AppSuccess<T> extends AppResult<T> {
