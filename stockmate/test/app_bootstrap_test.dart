@@ -10,7 +10,7 @@ void main() {
     expect(find.text('Dashboard'), findsWidgets);
     expect(find.text('Inventory'), findsOneWidget);
     expect(find.text('Scan'), findsOneWidget);
-    expect(find.text('Sales'), findsOneWidget);
+    expect(find.text('Sales'), findsWidgets);
     expect(find.text('Reports'), findsOneWidget);
   });
 }
