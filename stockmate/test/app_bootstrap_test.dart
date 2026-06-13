@@ -1,9 +1,10 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:stockmate/main.dart' as app;
+import 'package:stockmate/src/app.dart';
 
 void main() {
   testWidgets('app boots to dashboard tab', (tester) async {
-    app.main();
+    await tester.pumpWidget(ProviderScope(child: StockmateApp()));
     await tester.pumpAndSettle();
 
     expect(find.text('Dashboard'), findsWidgets);

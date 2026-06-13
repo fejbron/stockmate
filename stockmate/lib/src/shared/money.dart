@@ -9,8 +9,14 @@ class Money {
 
   factory Money.fromDecimal(String value) {
     final normalized = value.trim();
-    final parsed = double.parse(normalized);
-    return Money((parsed * 100).round());
+    final match = RegExp(r'^(\d+)(?:\.(\d{1,2}))?$').firstMatch(normalized);
+    if (match == null) {
+      throw FormatException('Invalid money amount', value);
+    }
+
+    final whole = int.parse(match.group(1)!);
+    final fraction = (match.group(2) ?? '').padRight(2, '0');
+    return Money((whole * 100) + int.parse(fraction));
   }
 
   Money operator +(Money other) => Money(minorUnits + other.minorUnits);
