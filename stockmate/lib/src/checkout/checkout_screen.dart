@@ -34,7 +34,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Checkout')),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
         children: [
           _CodeLookupPanel(
             controller: codeController,
@@ -152,29 +152,41 @@ class _CodeLookupPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final field = TextField(
+      controller: controller,
+      decoration: const InputDecoration(
+        labelText: 'Barcode or product code',
+        prefixIcon: Icon(Icons.qr_code_scanner),
+      ),
+      textInputAction: TextInputAction.done,
+      onSubmitted: (_) => onAdd(),
+    );
+    final button = FilledButton.icon(
+      onPressed: isAdding ? null : onAdd,
+      icon: const Icon(Icons.add_shopping_cart),
+      label: Text(isAdding ? 'Adding' : 'Add Product'),
+    );
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: controller,
-                decoration: const InputDecoration(
-                  labelText: 'Barcode or product code',
-                  prefixIcon: Icon(Icons.qr_code_scanner),
-                ),
-                textInputAction: TextInputAction.done,
-                onSubmitted: (_) => onAdd(),
-              ),
-            ),
-            const SizedBox(width: 12),
-            FilledButton.icon(
-              onPressed: isAdding ? null : onAdd,
-              icon: const Icon(Icons.add_shopping_cart),
-              label: Text(isAdding ? 'Adding' : 'Add Product'),
-            ),
-          ],
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            if (constraints.maxWidth < 520) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [field, const SizedBox(height: 12), button],
+              );
+            }
+
+            return Row(
+              children: [
+                Expanded(child: field),
+                const SizedBox(width: 12),
+                button,
+              ],
+            );
+          },
         ),
       ),
     );
@@ -206,39 +218,93 @@ class _CartLineTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final controller = ref.read(checkoutCartProvider.notifier);
+    final quantityControls = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          tooltip: 'Decrease quantity',
+          onPressed: () =>
+              controller.updateQuantity(line.productId, line.quantity - 1),
+          icon: const Icon(Icons.remove_circle_outline),
+        ),
+        SizedBox(
+          width: 32,
+          child: Text(
+            '${line.quantity}',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+        ),
+        IconButton(
+          tooltip: 'Increase quantity',
+          onPressed: line.quantity >= line.stockQuantity
+              ? null
+              : () => controller.updateQuantity(
+                  line.productId,
+                  line.quantity + 1,
+                ),
+          icon: const Icon(Icons.add_circle_outline),
+        ),
+      ],
+    );
 
     return Card(
-      child: ListTile(
-        leading: const Icon(Icons.inventory_2),
-        title: Text(line.name),
-        subtitle: Text('${line.quantity} in cart'),
-        trailing: SizedBox(
-          width: 168,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              IconButton(
-                tooltip: 'Decrease quantity',
-                onPressed: () => controller.updateQuantity(
-                  line.productId,
-                  line.quantity - 1,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isCompact = constraints.maxWidth < 420;
+            final details = Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.only(top: 2),
+                  child: Icon(Icons.inventory_2),
                 ),
-                icon: const Icon(Icons.remove_circle_outline),
-              ),
-              Text('${line.quantity}'),
-              IconButton(
-                tooltip: 'Increase quantity',
-                onPressed: line.quantity >= line.stockQuantity
-                    ? null
-                    : () => controller.updateQuantity(
-                        line.productId,
-                        line.quantity + 1,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        line.name,
+                        style: Theme.of(context).textTheme.titleMedium,
                       ),
-                icon: const Icon(Icons.add_circle_outline),
-              ),
-              Text(Money(line.subtotalMinor).format()),
-            ],
-          ),
+                      const SizedBox(height: 4),
+                      Text('${line.quantity} in cart'),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  Money(line.subtotalMinor).format(),
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ],
+            );
+
+            if (isCompact) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  details,
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: quantityControls,
+                  ),
+                ],
+              );
+            }
+
+            return Row(
+              children: [
+                Expanded(child: details),
+                const SizedBox(width: 12),
+                quantityControls,
+              ],
+            );
+          },
         ),
       ),
     );

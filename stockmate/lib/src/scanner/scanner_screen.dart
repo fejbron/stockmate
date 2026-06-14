@@ -147,6 +147,12 @@ class ScannerResultPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final product = this.product;
+    final price = product == null
+        ? null
+        : Text(
+            Money(product.sellingPriceMinor).format(),
+            style: Theme.of(context).textTheme.titleMedium,
+          );
 
     return Card(
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
@@ -155,15 +161,31 @@ class ScannerResultPanel extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.qr_code_2),
-              title: Text(product?.name ?? 'Unknown product'),
-              subtitle: Text('Last scanned: $code'),
-              trailing: product == null
-                  ? null
-                  : Text(Money(product.sellingPriceMinor).format()),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.only(top: 2),
+                  child: Icon(Icons.qr_code_2),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        product?.name ?? 'Unknown product',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 4),
+                      Text('Last scanned: $code'),
+                    ],
+                  ),
+                ),
+                if (price != null) ...[const SizedBox(width: 12), price],
+              ],
             ),
+            const SizedBox(height: 12),
             if (product == null)
               FilledButton.icon(
                 onPressed: onAddNewProduct,

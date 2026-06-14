@@ -16,6 +16,22 @@ class ProductInventoryItem {
   final int stockQuantity;
 }
 
+class EditableProduct {
+  const EditableProduct({
+    required this.id,
+    required this.name,
+    required this.codeValue,
+    required this.sellingPriceMinor,
+    required this.lowStockThreshold,
+  });
+
+  final int id;
+  final String name;
+  final String codeValue;
+  final int sellingPriceMinor;
+  final int lowStockThreshold;
+}
+
 class InventoryRepository {
   InventoryRepository(this.db);
 
@@ -61,6 +77,41 @@ class InventoryRepository {
       total += batch.quantityRemaining;
     }
     return total;
+  }
+
+  Future<EditableProduct?> productForEdit(int productId) async {
+    final rows = await db
+        .customSelect(
+          '''
+          SELECT
+            p.id,
+            p.name,
+            p.selling_price_minor,
+            p.low_stock_threshold,
+            pc.code_value
+          FROM products p
+          LEFT JOIN product_codes pc
+            ON pc.product_id = p.id AND pc.is_primary = 1
+          WHERE p.id = ?
+          LIMIT 1
+          ''',
+          variables: [Variable(productId)],
+          readsFrom: {db.products, db.productCodes},
+        )
+        .get();
+
+    if (rows.isEmpty) {
+      return null;
+    }
+
+    final row = rows.single;
+    return EditableProduct(
+      id: row.read<int>('id'),
+      name: row.read<String>('name'),
+      codeValue: row.read<String?>('code_value') ?? '',
+      sellingPriceMinor: row.read<int>('selling_price_minor'),
+      lowStockThreshold: row.read<int>('low_stock_threshold'),
+    );
   }
 
   Future<int> createProductWithStock({
@@ -109,6 +160,102 @@ class InventoryRepository {
 
       return productId;
     });
+  }
+
+  Future<void> updateProduct({
+    required int productId,
+    required String name,
+    required String codeValue,
+    required int sellingPriceMinor,
+    required int lowStockThreshold,
+    required int quantityReceived,
+    required int costPerUnitMinor,
+  }) {
+    return db.transaction(() async {
+      await (db.update(
+        db.products,
+      )..where((row) => row.id.equals(productId))).write(
+        ProductsCompanion(
+          name: Value(name),
+          sellingPriceMinor: Value(sellingPriceMinor),
+          lowStockThreshold: Value(lowStockThreshold),
+          updatedAt: Value(DateTime.now()),
+        ),
+      );
+
+      await _upsertPrimaryCode(productId: productId, codeValue: codeValue);
+
+      if (quantityReceived > 0) {
+        await db
+            .into(db.stockBatches)
+            .insert(
+              StockBatchesCompanion.insert(
+                productId: productId,
+                quantityReceived: quantityReceived,
+                quantityRemaining: quantityReceived,
+                costPerUnitMinor: costPerUnitMinor,
+                note: const Value('Stock added while editing product'),
+              ),
+            );
+      }
+    });
+  }
+
+  Future<void> deactivateProduct(int productId) {
+    return (db.update(
+      db.products,
+    )..where((row) => row.id.equals(productId))).write(
+      ProductsCompanion(
+        isActive: const Value(false),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
+  }
+
+  Future<void> _upsertPrimaryCode({
+    required int productId,
+    required String codeValue,
+  }) async {
+    final trimmedCode = codeValue.trim();
+    if (trimmedCode.isEmpty) {
+      return;
+    }
+
+    final existingCodes =
+        await (db.select(db.productCodes)
+              ..where(
+                (row) =>
+                    row.productId.equals(productId) &
+                    row.isPrimary.equals(true),
+              )
+              ..limit(1))
+            .get();
+
+    if (existingCodes.isEmpty) {
+      await db
+          .into(db.productCodes)
+          .insert(
+            ProductCodesCompanion.insert(
+              productId: productId,
+              codeValue: trimmedCode,
+              codeType: 'barcode',
+              source: 'scanned',
+              isPrimary: const Value(true),
+            ),
+          );
+      return;
+    }
+
+    await (db.update(
+      db.productCodes,
+    )..where((row) => row.id.equals(existingCodes.single.id))).write(
+      ProductCodesCompanion(
+        codeValue: Value(trimmedCode),
+        codeType: const Value('barcode'),
+        source: const Value('scanned'),
+        isPrimary: const Value(true),
+      ),
+    );
   }
 
   Future<void> addStockAdjustment({

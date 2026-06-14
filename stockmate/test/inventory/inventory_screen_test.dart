@@ -29,6 +29,8 @@ void main() {
     expect(find.text('Milo Tin'), findsOneWidget);
     expect(find.text('12 in stock'), findsOneWidget);
     expect(find.text('25.50'), findsOneWidget);
+    expect(find.byTooltip('Edit product'), findsOneWidget);
+    expect(find.byTooltip('Delete product'), findsOneWidget);
     expect(find.text('No products yet'), findsNothing);
   });
 }

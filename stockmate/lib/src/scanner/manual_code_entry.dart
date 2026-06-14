@@ -22,29 +22,33 @@ class _ManualCodeEntryState extends State<ManualCodeEntry> {
   Widget build(BuildContext context) {
     return Material(
       type: MaterialType.transparency,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: controller,
-              decoration: const InputDecoration(
-                labelText: 'Enter barcode or internal code',
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextField(
+                controller: controller,
+                decoration: const InputDecoration(
+                  labelText: 'Enter barcode or internal code',
+                ),
+                textInputAction: TextInputAction.done,
               ),
-              textInputAction: TextInputAction.done,
-            ),
-            const SizedBox(height: 12),
-            FilledButton(
-              onPressed: () {
-                final value = controller.text.trim();
-                if (value.isNotEmpty) {
-                  widget.onSubmitted(value);
-                }
-              },
-              child: const Text('Use Code'),
-            ),
-          ],
+              const SizedBox(height: 12),
+              FilledButton(
+                onPressed: () {
+                  final value = controller.text.trim();
+                  if (value.isNotEmpty) {
+                    widget.onSubmitted(value);
+                  }
+                },
+                child: const Text('Use Code'),
+              ),
+            ],
+          ),
         ),
       ),
     );
