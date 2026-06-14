@@ -5,7 +5,9 @@ import '../shared/money.dart';
 import 'inventory_providers.dart';
 
 class ProductFormScreen extends ConsumerStatefulWidget {
-  const ProductFormScreen({super.key});
+  const ProductFormScreen({this.initialCode, super.key});
+
+  final String? initialCode;
 
   @override
   ConsumerState<ProductFormScreen> createState() => _ProductFormScreenState();
@@ -15,14 +17,22 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
   final formKey = GlobalKey<FormState>();
   final nameController = TextEditingController();
   final priceController = TextEditingController();
+  final codeController = TextEditingController();
   final quantityController = TextEditingController();
   final costController = TextEditingController();
   var isSaving = false;
 
   @override
+  void initState() {
+    super.initState();
+    codeController.text = widget.initialCode ?? '';
+  }
+
+  @override
   void dispose() {
     nameController.dispose();
     priceController.dispose();
+    codeController.dispose();
     quantityController.dispose();
     costController.dispose();
     super.dispose();
@@ -56,6 +66,11 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
               ),
               textInputAction: TextInputAction.next,
               validator: _optionalMoneyValidator,
+            ),
+            TextFormField(
+              controller: codeController,
+              decoration: const InputDecoration(labelText: 'Product code'),
+              textInputAction: TextInputAction.next,
             ),
             TextFormField(
               controller: quantityController,
@@ -92,11 +107,14 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
     try {
       final useCase = ref.read(addStockUseCaseProvider);
       final generator = ref.read(internalCodeGeneratorProvider);
+      final enteredCode = codeController.text.trim();
       await useCase.createProductWithStock(
         name: nameController.text.trim(),
-        codeValue: generator.generate(productId: 0),
-        codeType: 'internal',
-        source: 'generated',
+        codeValue: enteredCode.isEmpty
+            ? generator.generate(productId: 0)
+            : enteredCode,
+        codeType: enteredCode.isEmpty ? 'internal' : 'barcode',
+        source: enteredCode.isEmpty ? 'generated' : 'scanned',
         sellingPriceMinor: _moneyMinorOrZero(priceController.text),
         quantityReceived: _intOrZero(quantityController.text),
         costPerUnitMinor: _moneyMinorOrZero(costController.text),
@@ -115,6 +133,7 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
       ).showSnackBar(const SnackBar(content: Text('Product saved')));
       nameController.clear();
       priceController.clear();
+      codeController.clear();
       quantityController.clear();
       costController.clear();
     } on Exception catch (error) {

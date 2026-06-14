@@ -1,32 +1,69 @@
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
+import '../checkout/cart_controller.dart';
+import '../checkout/checkout_providers.dart';
+import '../checkout/checkout_screen.dart';
+import '../checkout/checkout_repository.dart';
+import '../inventory/product_form_screen.dart';
+import '../shared/money.dart';
 import 'manual_code_entry.dart';
 
-class ScannerScreen extends StatefulWidget {
+class ScannerScreen extends ConsumerStatefulWidget {
   const ScannerScreen({super.key});
 
   @override
-  State<ScannerScreen> createState() => _ScannerScreenState();
+  ConsumerState<ScannerScreen> createState() => _ScannerScreenState();
 }
 
-class _ScannerScreenState extends State<ScannerScreen> {
+class _ScannerScreenState extends ConsumerState<ScannerScreen> {
   String? lastCode;
+  SellableProduct? matchedProduct;
+  bool isLookingUp = false;
 
-  void _handleCode(String code) {
+  Future<void> _handleCode(String code) async {
     final trimmedCode = code.trim();
-    if (trimmedCode.isEmpty) {
+    if (trimmedCode.isEmpty || isLookingUp) {
       return;
     }
-    setState(() => lastCode = trimmedCode);
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('Scanned $trimmedCode')));
+
+    setState(() {
+      lastCode = trimmedCode;
+      matchedProduct = null;
+      isLookingUp = true;
+    });
+
+    final product = await ref
+        .read(checkoutRepositoryProvider)
+        .findProductByCode(trimmedCode);
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      matchedProduct = product;
+      isLookingUp = false;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          product == null
+              ? 'No product found for $trimmedCode'
+              : '${product.name} found',
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final code = lastCode;
+    final product = matchedProduct;
+
     return Scaffold(
       appBar: AppBar(title: const Text('Scan Product')),
       body: Column(
@@ -41,21 +78,117 @@ class _ScannerScreenState extends State<ScannerScreen> {
                 ),
               ),
               onDetect: (capture) {
-                final code = capture.barcodes.firstOrNull?.rawValue;
-                if (code != null && code != lastCode) {
-                  _handleCode(code);
+                final detected = capture.barcodes.firstOrNull?.rawValue;
+                if (detected != null && detected.trim() != lastCode) {
+                  _handleCode(detected);
                 }
               },
             ),
           ),
-          if (lastCode case final code?)
-            ListTile(
-              leading: const Icon(Icons.qr_code_2),
-              title: const Text('Last scanned'),
-              subtitle: Text(code),
+          if (isLookingUp) const LinearProgressIndicator(),
+          if (code != null)
+            ScannerResultPanel(
+              code: code,
+              product: product,
+              onAddToCart: product == null ? null : () => _addProduct(product),
+              onRecordSale: product == null ? null : _openCheckout,
+              onAddNewProduct: () => _openNewProduct(code),
             ),
           ManualCodeEntry(onSubmitted: _handleCode),
         ],
+      ),
+    );
+  }
+
+  void _addProduct(SellableProduct product) {
+    if (product.stockQuantity <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${product.name} is out of stock')),
+      );
+      return;
+    }
+    ref.read(checkoutCartProvider.notifier).addProduct(product);
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('${product.name} added to cart')));
+  }
+
+  void _openCheckout() {
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const CheckoutScreen()));
+  }
+
+  void _openNewProduct(String code) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ProductFormScreen(initialCode: code),
+      ),
+    );
+  }
+}
+
+class ScannerResultPanel extends StatelessWidget {
+  const ScannerResultPanel({
+    required this.code,
+    required this.product,
+    required this.onAddToCart,
+    required this.onRecordSale,
+    required this.onAddNewProduct,
+    super.key,
+  });
+
+  final String code;
+  final SellableProduct? product;
+  final VoidCallback? onAddToCart;
+  final VoidCallback? onRecordSale;
+  final VoidCallback onAddNewProduct;
+
+  @override
+  Widget build(BuildContext context) {
+    final product = this.product;
+
+    return Card(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.qr_code_2),
+              title: Text(product?.name ?? 'Unknown product'),
+              subtitle: Text('Last scanned: $code'),
+              trailing: product == null
+                  ? null
+                  : Text(Money(product.sellingPriceMinor).format()),
+            ),
+            if (product == null)
+              FilledButton.icon(
+                onPressed: onAddNewProduct,
+                icon: const Icon(Icons.add_box),
+                label: const Text('Add New Product'),
+              )
+            else
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  FilledButton.icon(
+                    onPressed: onAddToCart,
+                    icon: const Icon(Icons.add_shopping_cart),
+                    label: const Text('Add to Sale'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: onRecordSale,
+                    icon: const Icon(Icons.point_of_sale),
+                    label: const Text('Record Sale'),
+                  ),
+                ],
+              ),
+          ],
+        ),
       ),
     );
   }

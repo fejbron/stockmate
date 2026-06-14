@@ -173,4 +173,13 @@ void main() {
     expect(await db.select(db.sales).get(), isEmpty);
     expect((await db.select(db.stockBatches).getSingle()).quantityRemaining, 2);
   });
+
+  test('returns failure without writing a sale when cart is empty', () async {
+    final result = await useCase.completeSale(
+      cart: const Cart(lines: [], paymentMethod: 'cash', amountPaidMinor: null),
+    );
+
+    expect(result.isSuccess, false);
+    expect(await db.select(db.sales).get(), isEmpty);
+  });
 }

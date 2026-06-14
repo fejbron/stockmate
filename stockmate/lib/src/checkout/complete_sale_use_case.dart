@@ -18,6 +18,12 @@ class CompleteSaleUseCase {
   Future<AppResult<CompleteSaleResult>> completeSale({
     required Cart cart,
   }) async {
+    if (cart.lines.isEmpty) {
+      return const AppFailure(
+        'Add at least one product before recording sale.',
+      );
+    }
+
     final amountPaidMinor = cart.amountPaidMinor;
     if (amountPaidMinor != null && amountPaidMinor < cart.totalMinor) {
       return const AppFailure('Amount paid is less than sale total.');

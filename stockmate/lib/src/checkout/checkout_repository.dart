@@ -4,10 +4,120 @@ import '../data/app_database.dart';
 import 'cart_models.dart';
 import 'stock_allocator.dart';
 
+class SellableProduct {
+  const SellableProduct({
+    required this.id,
+    required this.name,
+    required this.codeValue,
+    required this.sellingPriceMinor,
+    required this.stockQuantity,
+  });
+
+  final int id;
+  final String name;
+  final String codeValue;
+  final int sellingPriceMinor;
+  final int stockQuantity;
+}
+
+class SaleListItem {
+  const SaleListItem({
+    required this.id,
+    required this.receiptNumber,
+    required this.soldAt,
+    required this.totalMinor,
+    required this.grossProfitMinor,
+    required this.itemCount,
+  });
+
+  final int id;
+  final String receiptNumber;
+  final DateTime soldAt;
+  final int totalMinor;
+  final int grossProfitMinor;
+  final int itemCount;
+}
+
 class CheckoutRepository {
   CheckoutRepository(this.db);
 
   final AppDatabase db;
+
+  Future<SellableProduct?> findProductByCode(String code) async {
+    final trimmedCode = code.trim();
+    if (trimmedCode.isEmpty) {
+      return null;
+    }
+
+    final rows = await db
+        .customSelect(
+          '''
+          SELECT
+            p.id,
+            p.name,
+            pc.code_value,
+            p.selling_price_minor,
+            COALESCE(SUM(sb.quantity_remaining), 0) AS stock_quantity
+          FROM product_codes pc
+          INNER JOIN products p ON p.id = pc.product_id
+          LEFT JOIN stock_batches sb ON sb.product_id = p.id
+          WHERE pc.code_value = ? AND p.is_active = 1
+          GROUP BY p.id, p.name, pc.code_value, p.selling_price_minor
+          LIMIT 1
+          ''',
+          variables: [Variable(trimmedCode)],
+          readsFrom: {db.productCodes, db.products, db.stockBatches},
+        )
+        .get();
+
+    if (rows.isEmpty) {
+      return null;
+    }
+
+    final row = rows.single;
+    return SellableProduct(
+      id: row.read<int>('id'),
+      name: row.read<String>('name'),
+      codeValue: row.read<String>('code_value'),
+      sellingPriceMinor: row.read<int>('selling_price_minor'),
+      stockQuantity: row.read<int>('stock_quantity'),
+    );
+  }
+
+  Stream<List<SaleListItem>> watchRecentSales() {
+    return db
+        .customSelect(
+          '''
+          SELECT
+            s.id,
+            s.receipt_number,
+            s.sold_at,
+            s.total_minor,
+            s.gross_profit_minor,
+            COALESCE(SUM(sl.quantity), 0) AS item_count
+          FROM sales s
+          LEFT JOIN sale_lines sl ON sl.sale_id = s.id
+          GROUP BY s.id, s.receipt_number, s.sold_at, s.total_minor, s.gross_profit_minor
+          ORDER BY s.sold_at DESC, s.id DESC
+          LIMIT 50
+          ''',
+          readsFrom: {db.sales, db.saleLines},
+        )
+        .watch()
+        .map(
+          (rows) => [
+            for (final row in rows)
+              SaleListItem(
+                id: row.read<int>('id'),
+                receiptNumber: row.read<String>('receipt_number'),
+                soldAt: row.read<DateTime>('sold_at'),
+                totalMinor: row.read<int>('total_minor'),
+                grossProfitMinor: row.read<int>('gross_profit_minor'),
+                itemCount: row.read<int>('item_count'),
+              ),
+          ],
+        );
+  }
 
   Future<List<AvailableBatch>> availableBatches(int productId) async {
     final batches =
