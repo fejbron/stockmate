@@ -1,0 +1,30 @@
+# Stockmate — app icon configuration
+# Run with:  dart run flutter_launcher_icons
+#
+# 1. Copy the PNGs into:  assets/icon/
+# 2. Add this dev dependency to pubspec.yaml:
+#       dev_dependencies:
+#         flutter_launcher_icons: ^0.14.4
+# 3. Keep this file as flutter_launcher_icons.yaml and run the command above.
+
+flutter_launcher_icons:
+  image_path: "assets/icon/stockmate_icon_1024.png"
+
+  android: false
+  ios: true
+  remove_alpha_ios: true            # iOS forbids transparency; flattens onto the icon
+
+  # Android source layers are kept in assets/icon for future Android support,
+  # but this project currently generates iOS launcher icons only.
+  adaptive_icon_background: "#159a73"
+  adaptive_icon_foreground: "assets/icon/adaptive_foreground.png"
+  adaptive_icon_monochrome: "assets/icon/adaptive_monochrome.png"   # Android 13+ themed icons
+
+  web:
+    generate: false
+
+  windows:
+    generate: false
+
+  macos:
+    generate: false

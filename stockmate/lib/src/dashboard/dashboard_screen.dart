@@ -35,36 +35,55 @@ class _DashboardContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GridView.count(
+    return ListView(
       padding: const EdgeInsets.all(16),
-      crossAxisCount: 2,
-      mainAxisSpacing: 12,
-      crossAxisSpacing: 12,
-      childAspectRatio: 1.25,
       children: [
-        _MetricTile(
-          label: 'Revenue',
-          value: Money(metrics.revenueMinor).format(),
-          icon: Icons.payments,
-          color: const Color(0xFF2563EB),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: SizedBox(
+            key: const Key('stockmateLogo'),
+            width: 260,
+            child: Image.asset(
+              'assets/icon/stockmate_logo_lockup.png',
+              semanticLabel: 'Stockmate logo',
+              fit: BoxFit.contain,
+            ),
+          ),
         ),
-        _MetricTile(
-          label: 'Gross Profit',
-          value: Money(metrics.grossProfitMinor).format(),
-          icon: Icons.trending_up,
-          color: const Color(0xFF059669),
-        ),
-        _MetricTile(
-          label: 'Sales',
-          value: '${metrics.salesCount}',
-          icon: Icons.receipt_long,
-          color: const Color(0xFF7C3AED),
-        ),
-        _MetricTile(
-          label: 'Low Stock',
-          value: '${metrics.lowStockCount}',
-          icon: Icons.warning_amber,
-          color: const Color(0xFFDC2626),
+        const SizedBox(height: 16),
+        GridView.count(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisCount: 2,
+          mainAxisSpacing: 12,
+          crossAxisSpacing: 12,
+          childAspectRatio: 1.25,
+          children: [
+            _MetricTile(
+              label: 'Revenue',
+              value: Money(metrics.revenueMinor).format(),
+              icon: Icons.payments,
+              color: const Color(0xFF2563EB),
+            ),
+            _MetricTile(
+              label: 'Gross Profit',
+              value: Money(metrics.grossProfitMinor).format(),
+              icon: Icons.trending_up,
+              color: const Color(0xFF059669),
+            ),
+            _MetricTile(
+              label: 'Sales',
+              value: '${metrics.salesCount}',
+              icon: Icons.receipt_long,
+              color: const Color(0xFF7C3AED),
+            ),
+            _MetricTile(
+              label: 'Low Stock',
+              value: '${metrics.lowStockCount}',
+              icon: Icons.warning_amber,
+              color: const Color(0xFFDC2626),
+            ),
+          ],
         ),
       ],
     );

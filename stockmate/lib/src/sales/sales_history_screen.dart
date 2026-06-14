@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../checkout/checkout_providers.dart';
 import '../checkout/checkout_screen.dart';
 import '../checkout/checkout_repository.dart';
+import '../receipts/receipt_detail_screen.dart';
 import '../shared/money.dart';
 
 class SalesHistoryScreen extends ConsumerWidget {
@@ -58,18 +59,32 @@ class _SaleTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       child: ListTile(
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => ReceiptDetailScreen(saleId: item.id),
+            ),
+          );
+        },
         leading: const Icon(Icons.receipt_long),
         title: Text(item.receiptNumber),
         subtitle: Text('${item.itemCount} items'),
-        trailing: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.end,
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              Money(item.totalMinor).format(),
-              style: Theme.of(context).textTheme.titleMedium,
+            Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  Money(item.totalMinor).format(),
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                Text('Profit ${Money(item.grossProfitMinor).format()}'),
+              ],
             ),
-            Text('Profit ${Money(item.grossProfitMinor).format()}'),
+            const SizedBox(width: 8),
+            const Icon(Icons.chevron_right),
           ],
         ),
       ),

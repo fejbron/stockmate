@@ -24,9 +24,14 @@ void main() {
         child: const MaterialApp(home: DashboardScreen()),
       ),
     );
+    await tester.pump();
 
     expect(find.text('Today'), findsOneWidget);
     expect(find.text('Revenue'), findsOneWidget);
+    expect(
+      find.byKey(const Key('stockmateLogo'), skipOffstage: false),
+      findsOneWidget,
+    );
     expect(find.text('25.50'), findsOneWidget);
     expect(find.text('Gross Profit'), findsOneWidget);
     expect(find.text('8.50'), findsOneWidget);
