@@ -1,0 +1,18 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../data/database_provider.dart';
+import '../labels/internal_code_generator.dart';
+import 'add_stock_use_case.dart';
+import 'inventory_repository.dart';
+
+final inventoryRepositoryProvider = Provider<InventoryRepository>((ref) {
+  return InventoryRepository(ref.watch(databaseProvider));
+});
+
+final addStockUseCaseProvider = Provider<AddStockUseCase>((ref) {
+  return AddStockUseCase(ref.watch(inventoryRepositoryProvider));
+});
+
+final internalCodeGeneratorProvider = Provider<InternalCodeGenerator>((ref) {
+  return InternalCodeGenerator();
+});
