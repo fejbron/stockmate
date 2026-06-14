@@ -2,10 +2,55 @@ import 'package:drift/drift.dart';
 
 import '../data/app_database.dart';
 
+class ProductInventoryItem {
+  const ProductInventoryItem({
+    required this.id,
+    required this.name,
+    required this.sellingPriceMinor,
+    required this.stockQuantity,
+  });
+
+  final int id;
+  final String name;
+  final int sellingPriceMinor;
+  final int stockQuantity;
+}
+
 class InventoryRepository {
   InventoryRepository(this.db);
 
   final AppDatabase db;
+
+  Stream<List<ProductInventoryItem>> watchInventoryItems() {
+    return db
+        .customSelect(
+          '''
+          SELECT
+            p.id,
+            p.name,
+            p.selling_price_minor,
+            COALESCE(SUM(sb.quantity_remaining), 0) AS stock_quantity
+          FROM products p
+          LEFT JOIN stock_batches sb ON sb.product_id = p.id
+          WHERE p.is_active = 1
+          GROUP BY p.id, p.name, p.selling_price_minor
+          ORDER BY LOWER(p.name)
+          ''',
+          readsFrom: {db.products, db.stockBatches},
+        )
+        .watch()
+        .map(
+          (rows) => [
+            for (final row in rows)
+              ProductInventoryItem(
+                id: row.read<int>('id'),
+                name: row.read<String>('name'),
+                sellingPriceMinor: row.read<int>('selling_price_minor'),
+                stockQuantity: row.read<int>('stock_quantity'),
+              ),
+          ],
+        );
+  }
 
   Future<int> currentStock(int productId) async {
     final batches = await (db.select(

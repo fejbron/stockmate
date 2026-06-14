@@ -13,7 +13,9 @@ void main() {
     db = AppDatabase(NativeDatabase.memory());
   });
 
-  tearDown(() => db.close());
+  tearDown(() async {
+    await db.close();
+  });
 
   testWidgets('requires product name before save', (tester) async {
     await tester.pumpWidget(_testApp(db));
@@ -32,7 +34,8 @@ void main() {
     await tester.enterText(find.bySemanticsLabel('Quantity received'), '12');
     await tester.enterText(find.bySemanticsLabel('Cost per unit'), '17.00');
     await tester.tap(find.text('Save Product'));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump();
 
     final product = await db.select(db.products).getSingle();
     final code = await db.select(db.productCodes).getSingle();

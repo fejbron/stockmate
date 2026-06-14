@@ -16,3 +16,8 @@ final addStockUseCaseProvider = Provider<AddStockUseCase>((ref) {
 final internalCodeGeneratorProvider = Provider<InternalCodeGenerator>((ref) {
   return InternalCodeGenerator();
 });
+
+final inventoryItemsProvider =
+    StreamProvider.autoDispose<List<ProductInventoryItem>>((ref) {
+      return ref.watch(inventoryRepositoryProvider).watchInventoryItems();
+    });

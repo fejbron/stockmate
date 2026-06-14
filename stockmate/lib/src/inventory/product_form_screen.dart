@@ -106,6 +106,10 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
       if (!mounted) {
         return;
       }
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop(true);
+        return;
+      }
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Product saved')));
