@@ -93,6 +93,54 @@ void main() {
     expect(product.sellingPriceMinor, 3000);
     expect(code.codeValue, 'NEW-CODE');
     expect(find.text('Product updated'), findsOneWidget);
+
+    await _clearWidgetTree(tester);
+  });
+
+  testWidgets('shows and adds barcode aliases in edit mode', (tester) async {
+    final productId = await db
+        .into(db.products)
+        .insert(
+          ProductsCompanion.insert(name: 'Milo Tin', sellingPriceMinor: 2550),
+        );
+    await db
+        .into(db.productCodes)
+        .insert(
+          ProductCodesCompanion.insert(
+            productId: productId,
+            codeValue: 'PRIMARY-CODE',
+            codeType: 'barcode',
+            source: 'scanned',
+            isPrimary: const Value(true),
+          ),
+        );
+
+    await tester.pumpWidget(_testApp(db, productId: productId));
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('Barcodes'), findsOneWidget);
+    expect(find.text('PRIMARY-CODE'), findsWidgets);
+    expect(find.text('Primary'), findsOneWidget);
+
+    await tester.drag(find.byType(ListView), const Offset(0, -320));
+    await tester.pump();
+    await tester.enterText(
+      find.byKey(const Key('additionalBarcodeField')),
+      'ALIAS-CODE',
+    );
+    await tester.tap(find.text('Add Barcode'));
+    await tester.pump();
+    await tester.pump();
+
+    final codes = await (db.select(
+      db.productCodes,
+    )..orderBy([(row) => OrderingTerm.asc(row.codeValue)])).get();
+
+    expect(codes.map((code) => code.codeValue), ['ALIAS-CODE', 'PRIMARY-CODE']);
+    expect(find.text('Barcode added'), findsOneWidget);
+
+    await _clearWidgetTree(tester);
   });
 }
 
@@ -101,4 +149,9 @@ Widget _testApp(AppDatabase db, {int? productId}) {
     overrides: [databaseProvider.overrideWithValue(db)],
     child: MaterialApp(home: ProductFormScreen(productId: productId)),
   );
+}
+
+Future<void> _clearWidgetTree(WidgetTester tester) async {
+  await tester.pumpWidget(const SizedBox.shrink());
+  await tester.pump(const Duration(milliseconds: 1));
 }

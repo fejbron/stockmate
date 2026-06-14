@@ -7,6 +7,7 @@ import '../checkout/cart_controller.dart';
 import '../checkout/checkout_providers.dart';
 import '../checkout/checkout_screen.dart';
 import '../checkout/checkout_repository.dart';
+import '../inventory/link_barcode_screen.dart';
 import '../inventory/product_form_screen.dart';
 import '../shared/money.dart';
 import 'manual_code_entry.dart';
@@ -93,6 +94,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
               onAddToCart: product == null ? null : () => _addProduct(product),
               onRecordSale: product == null ? null : _openCheckout,
               onAddNewProduct: () => _openNewProduct(code),
+              onLinkExistingProduct: () => _openLinkProduct(code),
             ),
           ManualCodeEntry(onSubmitted: _handleCode),
         ],
@@ -126,6 +128,20 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
       ),
     );
   }
+
+  Future<void> _openLinkProduct(String code) async {
+    final linked = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) => LinkBarcodeScreen(codeValue: code),
+      ),
+    );
+    if (linked == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Barcode linked and stock added')),
+      );
+      await _handleCode(code);
+    }
+  }
 }
 
 class ScannerResultPanel extends StatelessWidget {
@@ -135,6 +151,7 @@ class ScannerResultPanel extends StatelessWidget {
     required this.onAddToCart,
     required this.onRecordSale,
     required this.onAddNewProduct,
+    required this.onLinkExistingProduct,
     super.key,
   });
 
@@ -143,6 +160,7 @@ class ScannerResultPanel extends StatelessWidget {
   final VoidCallback? onAddToCart;
   final VoidCallback? onRecordSale;
   final VoidCallback onAddNewProduct;
+  final VoidCallback onLinkExistingProduct;
 
   @override
   Widget build(BuildContext context) {
@@ -187,10 +205,21 @@ class ScannerResultPanel extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             if (product == null)
-              FilledButton.icon(
-                onPressed: onAddNewProduct,
-                icon: const Icon(Icons.add_box),
-                label: const Text('Add New Product'),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  FilledButton.icon(
+                    onPressed: onLinkExistingProduct,
+                    icon: const Icon(Icons.link),
+                    label: const Text('Link to Existing Product'),
+                  ),
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: onAddNewProduct,
+                    icon: const Icon(Icons.add_box),
+                    label: const Text('Add New Product'),
+                  ),
+                ],
               )
             else
               Wrap(

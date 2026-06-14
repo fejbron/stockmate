@@ -21,3 +21,15 @@ final inventoryItemsProvider =
     StreamProvider.autoDispose<List<ProductInventoryItem>>((ref) {
       return ref.watch(inventoryRepositoryProvider).watchInventoryItems();
     });
+
+final activeProductLookupProvider =
+    StreamProvider.autoDispose<List<ProductLookupItem>>((ref) {
+      return ref.watch(inventoryRepositoryProvider).watchActiveProductLookup();
+    });
+
+final productCodesProvider = StreamProvider.autoDispose
+    .family<List<ProductCodeItem>, int>((ref, productId) {
+      return ref
+          .watch(inventoryRepositoryProvider)
+          .watchProductCodes(productId);
+    });

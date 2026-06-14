@@ -32,6 +32,7 @@ void main() {
     expect(find.text('Unknown product'), findsOneWidget);
     expect(find.text('Last scanned: INT-000001'), findsOneWidget);
     expect(find.text('Add New Product'), findsOneWidget);
+    expect(find.text('Link to Existing Product'), findsOneWidget);
   });
 
   testWidgets('camera fallback explains manual entry', (tester) async {

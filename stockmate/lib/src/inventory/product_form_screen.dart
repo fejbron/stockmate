@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../shared/money.dart';
 import 'inventory_providers.dart';
+import 'inventory_repository.dart';
 
 class ProductFormScreen extends ConsumerStatefulWidget {
   const ProductFormScreen({this.initialCode, this.productId, super.key});
@@ -19,6 +20,7 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
   final nameController = TextEditingController();
   final priceController = TextEditingController();
   final codeController = TextEditingController();
+  final aliasCodeController = TextEditingController();
   final lowStockController = TextEditingController();
   final quantityController = TextEditingController();
   final costController = TextEditingController();
@@ -42,6 +44,7 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
     nameController.dispose();
     priceController.dispose();
     codeController.dispose();
+    aliasCodeController.dispose();
     lowStockController.dispose();
     quantityController.dispose();
     costController.dispose();
@@ -124,6 +127,15 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
+                    if (isEditing && widget.productId != null) ...[
+                      _BarcodeAliasesCard(
+                        productId: widget.productId!,
+                        aliasCodeController: aliasCodeController,
+                        onAddCode: _addAliasCode,
+                        onDeleteCode: _deleteAliasCode,
+                      ),
+                      const SizedBox(height: 16),
+                    ],
                     Card(
                       child: Padding(
                         padding: const EdgeInsets.all(16),
@@ -311,6 +323,54 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
         );
   }
 
+  Future<void> _addAliasCode() async {
+    final productId = widget.productId;
+    final codeValue = aliasCodeController.text.trim();
+    if (productId == null || codeValue.isEmpty) {
+      return;
+    }
+
+    try {
+      await ref
+          .read(inventoryRepositoryProvider)
+          .linkCodeToExistingProduct(
+            productId: productId,
+            codeValue: codeValue,
+            quantityReceived: 0,
+            costPerUnitMinor: 0,
+          );
+      aliasCodeController.clear();
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Barcode added')));
+      }
+    } on DuplicateProductCodeException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.toString())));
+      }
+    }
+  }
+
+  Future<void> _deleteAliasCode(ProductCodeItem code) async {
+    try {
+      await ref.read(inventoryRepositoryProvider).deleteProductCode(code.id);
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Barcode removed')));
+      }
+    } on PrimaryProductCodeException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.toString())));
+      }
+    }
+  }
+
   String? _optionalMoneyValidator(String? value) {
     final text = value?.trim() ?? '';
     if (text.isEmpty) {
@@ -350,5 +410,106 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
       return 0;
     }
     return int.parse(text);
+  }
+}
+
+class _BarcodeAliasesCard extends ConsumerWidget {
+  const _BarcodeAliasesCard({
+    required this.productId,
+    required this.aliasCodeController,
+    required this.onAddCode,
+    required this.onDeleteCode,
+  });
+
+  final int productId;
+  final TextEditingController aliasCodeController;
+  final VoidCallback onAddCode;
+  final ValueChanged<ProductCodeItem> onDeleteCode;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final codes = ref.watch(productCodesProvider(productId));
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('Barcodes', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 12),
+            codes.when(
+              data: (items) {
+                if (items.isEmpty) {
+                  return const Text('No barcodes linked yet');
+                }
+
+                return Column(
+                  children: [
+                    for (final code in items)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.qr_code_2),
+                            const SizedBox(width: 12),
+                            Expanded(child: Text(code.codeValue)),
+                            if (code.isPrimary)
+                              const Chip(label: Text('Primary'))
+                            else
+                              IconButton(
+                                tooltip: 'Remove barcode',
+                                onPressed: () => onDeleteCode(code),
+                                icon: const Icon(Icons.delete_outline),
+                              ),
+                          ],
+                        ),
+                      ),
+                  ],
+                );
+              },
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (error, stackTrace) =>
+                  Text('Could not load barcodes: $error'),
+            ),
+            const SizedBox(height: 4),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final field = TextField(
+                  key: const Key('additionalBarcodeField'),
+                  controller: aliasCodeController,
+                  decoration: const InputDecoration(
+                    labelText: 'Additional barcode',
+                    prefixIcon: Icon(Icons.link),
+                  ),
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => onAddCode(),
+                );
+                final button = FilledButton.icon(
+                  onPressed: onAddCode,
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add Barcode'),
+                );
+
+                if (constraints.maxWidth < 520) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [field, const SizedBox(height: 12), button],
+                  );
+                }
+
+                return Row(
+                  children: [
+                    Expanded(child: field),
+                    const SizedBox(width: 12),
+                    button,
+                  ],
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

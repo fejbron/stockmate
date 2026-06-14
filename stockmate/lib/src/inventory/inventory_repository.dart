@@ -32,6 +32,50 @@ class EditableProduct {
   final int lowStockThreshold;
 }
 
+class ProductCodeItem {
+  const ProductCodeItem({
+    required this.id,
+    required this.codeValue,
+    required this.isPrimary,
+  });
+
+  final int id;
+  final String codeValue;
+  final bool isPrimary;
+}
+
+class ProductLookupItem {
+  const ProductLookupItem({required this.id, required this.name});
+
+  final int id;
+  final String name;
+}
+
+class DuplicateProductCodeException implements Exception {
+  const DuplicateProductCodeException(this.codeValue);
+
+  final String codeValue;
+
+  @override
+  String toString() => 'Code $codeValue is already linked to a product.';
+}
+
+class PrimaryProductCodeException implements Exception {
+  const PrimaryProductCodeException();
+
+  @override
+  String toString() => 'The primary product code cannot be deleted.';
+}
+
+class ProductNotFoundException implements Exception {
+  const ProductNotFoundException(this.productId);
+
+  final int productId;
+
+  @override
+  String toString() => 'Product $productId was not found.';
+}
+
 class InventoryRepository {
   InventoryRepository(this.db);
 
@@ -77,6 +121,40 @@ class InventoryRepository {
       total += batch.quantityRemaining;
     }
     return total;
+  }
+
+  Stream<List<ProductCodeItem>> watchProductCodes(int productId) {
+    return (db.select(db.productCodes)
+          ..where((row) => row.productId.equals(productId))
+          ..orderBy([
+            (row) => OrderingTerm.desc(row.isPrimary),
+            (row) => OrderingTerm.asc(row.createdAt),
+            (row) => OrderingTerm.asc(row.codeValue),
+          ]))
+        .watch()
+        .map(
+          (codes) => [
+            for (final code in codes)
+              ProductCodeItem(
+                id: code.id,
+                codeValue: code.codeValue,
+                isPrimary: code.isPrimary,
+              ),
+          ],
+        );
+  }
+
+  Stream<List<ProductLookupItem>> watchActiveProductLookup() {
+    return (db.select(db.products)
+          ..where((row) => row.isActive.equals(true))
+          ..orderBy([(row) => OrderingTerm.asc(row.name)]))
+        .watch()
+        .map(
+          (products) => [
+            for (final product in products)
+              ProductLookupItem(id: product.id, name: product.name),
+          ],
+        );
   }
 
   Future<EditableProduct?> productForEdit(int productId) async {
@@ -210,6 +288,84 @@ class InventoryRepository {
         updatedAt: Value(DateTime.now()),
       ),
     );
+  }
+
+  Future<void> linkCodeToExistingProduct({
+    required int productId,
+    required String codeValue,
+    required int quantityReceived,
+    required int costPerUnitMinor,
+  }) {
+    return db.transaction(() async {
+      final trimmedCode = codeValue.trim();
+      if (trimmedCode.isEmpty) {
+        return;
+      }
+
+      final product =
+          await (db.select(db.products)
+                ..where(
+                  (row) => row.id.equals(productId) & row.isActive.equals(true),
+                )
+                ..limit(1))
+              .getSingleOrNull();
+      if (product == null) {
+        throw ProductNotFoundException(productId);
+      }
+
+      final existingCode =
+          await (db.select(db.productCodes)
+                ..where((row) => row.codeValue.equals(trimmedCode))
+                ..limit(1))
+              .getSingleOrNull();
+      if (existingCode != null) {
+        throw DuplicateProductCodeException(trimmedCode);
+      }
+
+      await db
+          .into(db.productCodes)
+          .insert(
+            ProductCodesCompanion.insert(
+              productId: productId,
+              codeValue: trimmedCode,
+              codeType: 'barcode',
+              source: 'scanned',
+              isPrimary: const Value(false),
+            ),
+          );
+
+      if (quantityReceived > 0) {
+        await db
+            .into(db.stockBatches)
+            .insert(
+              StockBatchesCompanion.insert(
+                productId: productId,
+                quantityReceived: quantityReceived,
+                quantityRemaining: quantityReceived,
+                costPerUnitMinor: costPerUnitMinor,
+                note: Value('Stock added while linking code $trimmedCode'),
+              ),
+            );
+      }
+    });
+  }
+
+  Future<void> deleteProductCode(int productCodeId) async {
+    final code =
+        await (db.select(db.productCodes)
+              ..where((row) => row.id.equals(productCodeId))
+              ..limit(1))
+            .getSingleOrNull();
+    if (code == null) {
+      return;
+    }
+    if (code.isPrimary) {
+      throw const PrimaryProductCodeException();
+    }
+
+    await (db.delete(
+      db.productCodes,
+    )..where((row) => row.id.equals(productCodeId))).go();
   }
 
   Future<void> _upsertPrimaryCode({
