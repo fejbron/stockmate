@@ -531,7 +531,7 @@ class AppRestarterState extends State<AppRestarter> {
 
     final old = _container;
     _container = ProviderContainer();
-    await old.dispose();
+    old.dispose();
 
     setState(() => _busy = false);
 
