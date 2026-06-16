@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../backup/data_backup_card.dart';
 import '../shared/money.dart';
 import 'reports_providers.dart';
 import 'reports_repository.dart';
@@ -93,6 +95,10 @@ class _ReportsContent extends StatelessWidget {
                           child: _TopProductTile(product: product),
                         );
                       }),
+                    if (!kIsWeb) ...[
+                      const SizedBox(height: 28),
+                      const DataBackupCard(),
+                    ],
                   ],
                 ),
               ),
