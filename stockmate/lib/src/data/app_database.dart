@@ -16,9 +16,9 @@ class Products extends Table {
 
   @override
   List<String> get customConstraints => [
-        'CHECK (selling_price_minor >= 0)',
-        'CHECK (low_stock_threshold >= 0)',
-      ];
+    'CHECK (selling_price_minor >= 0)',
+    'CHECK (low_stock_threshold >= 0)',
+  ];
 }
 
 class ProductCodes extends Table {
@@ -43,11 +43,11 @@ class StockBatches extends Table {
 
   @override
   List<String> get customConstraints => [
-        'CHECK (quantity_received >= 0)',
-        'CHECK (quantity_remaining >= 0)',
-        'CHECK (quantity_remaining <= quantity_received)',
-        'CHECK (cost_per_unit_minor >= 0)',
-      ];
+    'CHECK (quantity_received >= 0)',
+    'CHECK (quantity_remaining >= 0)',
+    'CHECK (quantity_remaining <= quantity_received)',
+    'CHECK (cost_per_unit_minor >= 0)',
+  ];
 }
 
 class StockAdjustments extends Table {
@@ -77,13 +77,13 @@ class Sales extends Table {
 
   @override
   List<String> get customConstraints => [
-        'CHECK (subtotal_minor >= 0)',
-        'CHECK (discount_total_minor >= 0)',
-        'CHECK (total_minor >= 0)',
-        'CHECK (cost_total_minor >= 0)',
-        'CHECK (amount_paid_minor IS NULL OR amount_paid_minor >= 0)',
-        'CHECK (change_due_minor IS NULL OR change_due_minor >= 0)',
-      ];
+    'CHECK (subtotal_minor >= 0)',
+    'CHECK (discount_total_minor >= 0)',
+    'CHECK (total_minor >= 0)',
+    'CHECK (cost_total_minor >= 0)',
+    'CHECK (amount_paid_minor IS NULL OR amount_paid_minor >= 0)',
+    'CHECK (change_due_minor IS NULL OR change_due_minor >= 0)',
+  ];
 }
 
 class SaleLines extends Table {
@@ -100,12 +100,12 @@ class SaleLines extends Table {
 
   @override
   List<String> get customConstraints => [
-        'CHECK (quantity > 0)',
-        'CHECK (unit_price_minor >= 0)',
-        'CHECK (discount_amount_minor >= 0)',
-        'CHECK (line_total_minor >= 0)',
-        'CHECK (cost_total_minor >= 0)',
-      ];
+    'CHECK (quantity > 0)',
+    'CHECK (unit_price_minor >= 0)',
+    'CHECK (discount_amount_minor >= 0)',
+    'CHECK (line_total_minor >= 0)',
+    'CHECK (cost_total_minor >= 0)',
+  ];
 }
 
 class SaleLineBatchAllocations extends Table {
@@ -118,10 +118,10 @@ class SaleLineBatchAllocations extends Table {
 
   @override
   List<String> get customConstraints => [
-        'CHECK (quantity > 0)',
-        'CHECK (cost_per_unit_minor >= 0)',
-        'CHECK (cost_total_minor >= 0)',
-      ];
+    'CHECK (quantity > 0)',
+    'CHECK (cost_per_unit_minor >= 0)',
+    'CHECK (cost_total_minor >= 0)',
+  ];
 }
 
 class Receipts extends Table {
@@ -149,15 +149,24 @@ class Receipts extends Table {
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
-  AppDatabase.defaults() : super(driftDatabase(name: 'stockmate'));
+  AppDatabase.defaults()
+    : super(
+        driftDatabase(
+          name: 'stockmate',
+          web: DriftWebOptions(
+            sqlite3Wasm: Uri.parse('sqlite3.wasm'),
+            driftWorker: Uri.parse('drift_worker.js'),
+          ),
+        ),
+      );
 
   @override
   int get schemaVersion => 1;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
-        beforeOpen: (details) async {
-          await customStatement('PRAGMA foreign_keys = ON');
-        },
-      );
+    beforeOpen: (details) async {
+      await customStatement('PRAGMA foreign_keys = ON');
+    },
+  );
 }

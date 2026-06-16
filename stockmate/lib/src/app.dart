@@ -12,15 +12,15 @@ class StockmateApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = ColorScheme.fromSeed(
-      seedColor: const Color(0xFF0F766E),
-      primary: const Color(0xFF0F766E),
-      secondary: const Color(0xFF2563EB),
-      tertiary: const Color(0xFF7C3AED),
-      surface: const Color(0xFFF7F8FA),
+      seedColor: const Color(0xFFFF6237),
+      primary: const Color(0xFFFF6237),
+      secondary: const Color(0xFF16A34A),
+      tertiary: const Color(0xFF2563EB),
+      surface: const Color(0xFFEFF3F6),
     );
 
     return MaterialApp.router(
-      title: 'Stockmate',
+      title: 'EziTally',
       theme: ThemeData(
         colorScheme: colorScheme,
         useMaterial3: true,
@@ -39,19 +39,29 @@ class StockmateApp extends StatelessWidget {
           color: Colors.white,
           margin: EdgeInsets.zero,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-            side: const BorderSide(color: Color(0xFFE5E7EB)),
+            borderRadius: BorderRadius.circular(24),
           ),
         ),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
           fillColor: Colors.white,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(18),
+            borderSide: BorderSide.none,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(18),
+            borderSide: BorderSide.none,
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(18),
+            borderSide: const BorderSide(color: Color(0xFFFF6237), width: 1.5),
+          ),
         ),
         filledButtonTheme: FilledButtonThemeData(
           style: FilledButton.styleFrom(
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(18),
             ),
             minimumSize: const Size(48, 48),
           ),
@@ -59,15 +69,30 @@ class StockmateApp extends StatelessWidget {
         outlinedButtonTheme: OutlinedButtonThemeData(
           style: OutlinedButton.styleFrom(
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(18),
             ),
             minimumSize: const Size(48, 48),
           ),
         ),
         navigationBarTheme: NavigationBarThemeData(
           backgroundColor: Colors.white,
-          indicatorColor: colorScheme.primaryContainer,
+          indicatorColor: colorScheme.primary,
           labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+          iconTheme: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
+              return const IconThemeData(color: Colors.white);
+            }
+            return const IconThemeData(color: Color(0xFF6B7280));
+          }),
+          labelTextStyle: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
+              return const TextStyle(
+                color: Color(0xFFFF6237),
+                fontWeight: FontWeight.w800,
+              );
+            }
+            return const TextStyle(color: Color(0xFF6B7280));
+          }),
         ),
       ),
       routerConfig: router,

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,7 +15,11 @@ import '../shared/money.dart';
 import 'manual_code_entry.dart';
 
 class ScannerScreen extends ConsumerStatefulWidget {
-  const ScannerScreen({super.key});
+  const ScannerScreen({this.controller, super.key});
+
+  /// Optional injected controller, primarily for tests. When null, the screen
+  /// owns its own [MobileScannerController].
+  final MobileScannerController? controller;
 
   @override
   ConsumerState<ScannerScreen> createState() => _ScannerScreenState();
@@ -23,6 +29,67 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
   String? lastCode;
   SellableProduct? matchedProduct;
   bool isLookingUp = false;
+
+  late final MobileScannerController _scannerController =
+      widget.controller ?? MobileScannerController();
+
+  /// Whether this screen's navigation branch is the visible one.
+  ///
+  /// The camera is a single shared resource: only one [MobileScanner] may hold
+  /// it at a time. This tab lives inside an `IndexedStack` (it stays mounted
+  /// even when another tab is shown), so we must release the camera whenever
+  /// the tab is hidden or a route is pushed over it. Otherwise the checkout
+  /// "Scan barcode" camera cannot open.
+  bool _isBranchVisible = true;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // go_router's StatefulShellRoute.indexedStack wraps each branch in a
+    // TickerMode that is disabled while the branch is offstage.
+    final isVisible = TickerMode.of(context);
+    if (isVisible == _isBranchVisible) {
+      return;
+    }
+    _isBranchVisible = isVisible;
+    unawaited(isVisible ? _startCamera() : _stopCamera());
+  }
+
+  @override
+  void dispose() {
+    _scannerController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _startCamera() async {
+    try {
+      await _scannerController.start();
+    } on Exception {
+      // Surfaced to the user via MobileScanner's errorBuilder.
+    }
+  }
+
+  Future<void> _stopCamera() async {
+    try {
+      await _scannerController.stop();
+    } on Exception {
+      // Stopping an already-stopped camera is a no-op; ignore failures.
+    }
+  }
+
+  /// Releases the camera, runs a pushed-route [navigation], then resumes the
+  /// camera on return (if the tab is still visible). This frees the shared
+  /// camera so screens like checkout can open their own scanner.
+  Future<T?> _withCameraReleased<T>(
+    Future<T?> Function() navigation,
+  ) async {
+    await _stopCamera();
+    final result = await navigation();
+    if (mounted && _isBranchVisible) {
+      await _startCamera();
+    }
+    return result;
+  }
 
   Future<void> _handleCode(String code) async {
     final trimmedCode = code.trim();
@@ -71,6 +138,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
         children: [
           Expanded(
             child: MobileScanner(
+              controller: _scannerController,
               errorBuilder: (context, error) => const ScannerCameraFallback(),
               placeholderBuilder: (context) => const ColoredBox(
                 color: Colors.black,
@@ -116,23 +184,33 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
   }
 
   void _openCheckout() {
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute<void>(builder: (_) => const CheckoutScreen()));
+    unawaited(
+      _withCameraReleased<void>(
+        () => Navigator.of(context).push<void>(
+          MaterialPageRoute<void>(builder: (_) => const CheckoutScreen()),
+        ),
+      ),
+    );
   }
 
   void _openNewProduct(String code) {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => ProductFormScreen(initialCode: code),
+    unawaited(
+      _withCameraReleased<void>(
+        () => Navigator.of(context).push<void>(
+          MaterialPageRoute<void>(
+            builder: (_) => ProductFormScreen(initialCode: code),
+          ),
+        ),
       ),
     );
   }
 
   Future<void> _openLinkProduct(String code) async {
-    final linked = await Navigator.of(context).push<bool>(
-      MaterialPageRoute<bool>(
-        builder: (_) => LinkBarcodeScreen(codeValue: code),
+    final linked = await _withCameraReleased<bool>(
+      () => Navigator.of(context).push<bool>(
+        MaterialPageRoute<bool>(
+          builder: (_) => LinkBarcodeScreen(codeValue: code),
+        ),
       ),
     );
     if (linked == true && mounted) {

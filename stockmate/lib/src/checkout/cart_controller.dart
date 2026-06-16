@@ -26,11 +26,15 @@ class CheckoutCartController extends Notifier<CartDraft> {
   }
 
   void setAmountPaid(String value) {
-    state = state.copyWith(
-      amountPaidMinor: value.trim().isEmpty
-          ? null
-          : Money.fromDecimal(value).minorUnits,
-    );
+    state = state.setAmountPaid(value);
+  }
+
+  void setDiscountAmount(String value) {
+    state = state.setDiscountAmount(value);
+  }
+
+  void setDiscountPercent(String value) {
+    state = state.setDiscountPercent(value);
   }
 
   void clear() {
@@ -43,6 +47,7 @@ class CartDraft {
     required this.lines,
     required this.paymentMethod,
     required this.amountPaidMinor,
+    required this.discountMinor,
   });
 
   factory CartDraft.empty() {
@@ -50,12 +55,14 @@ class CartDraft {
       lines: [],
       paymentMethod: 'cash',
       amountPaidMinor: null,
+      discountMinor: 0,
     );
   }
 
   final List<CartDraftLine> lines;
   final String paymentMethod;
   final int? amountPaidMinor;
+  final int discountMinor;
 
   bool get isEmpty => lines.isEmpty;
 
@@ -67,9 +74,14 @@ class CartDraft {
     return total;
   }
 
-  int get discountTotalMinor => 0;
+  int get discountTotalMinor => discountMinor.clamp(0, subtotalMinor).toInt();
 
   int get totalMinor => subtotalMinor - discountTotalMinor;
+
+  int get balanceDueMinor {
+    final amountPaid = amountPaidMinor ?? 0;
+    return (totalMinor - amountPaid).clamp(0, totalMinor).toInt();
+  }
 
   CartDraft addProduct(SellableProduct product) {
     final updatedLines = <CartDraftLine>[];
@@ -129,16 +141,44 @@ class CartDraft {
     );
   }
 
+  CartDraft setAmountPaid(String value) {
+    return copyWith(
+      amountPaidMinor: value.trim().isEmpty
+          ? null
+          : Money.fromDecimal(value).minorUnits,
+    );
+  }
+
+  CartDraft setDiscountAmount(String value) {
+    final trimmed = value.trim();
+    final discount = trimmed.isEmpty
+        ? 0
+        : Money.fromDecimal(trimmed).minorUnits;
+    return copyWith(discountMinor: discount.clamp(0, subtotalMinor).toInt());
+  }
+
+  CartDraft setDiscountPercent(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) {
+      return copyWith(discountMinor: 0);
+    }
+
+    final percent = double.parse(trimmed).clamp(0, 100);
+    final discount = (subtotalMinor * (percent / 100)).round();
+    return copyWith(discountMinor: discount.clamp(0, subtotalMinor).toInt());
+  }
+
   Cart toCart() {
+    final lineDiscounts = _distributedDiscounts();
     return Cart(
       lines: [
-        for (final line in lines)
+        for (var index = 0; index < lines.length; index += 1)
           CartLine(
-            productId: line.productId,
-            name: line.name,
-            quantity: line.quantity,
-            unitPriceMinor: line.unitPriceMinor,
-            discountMinor: 0,
+            productId: lines[index].productId,
+            name: lines[index].name,
+            quantity: lines[index].quantity,
+            unitPriceMinor: lines[index].unitPriceMinor,
+            discountMinor: lineDiscounts[index],
           ),
       ],
       paymentMethod: paymentMethod,
@@ -146,10 +186,32 @@ class CartDraft {
     );
   }
 
+  List<int> _distributedDiscounts() {
+    if (lines.isEmpty || discountTotalMinor == 0 || subtotalMinor == 0) {
+      return [for (final _ in lines) 0];
+    }
+
+    final discounts = <int>[];
+    var assigned = 0;
+    for (var index = 0; index < lines.length; index += 1) {
+      final line = lines[index];
+      if (index == lines.length - 1) {
+        discounts.add(discountTotalMinor - assigned);
+      } else {
+        final lineDiscount =
+            (discountTotalMinor * (line.subtotalMinor / subtotalMinor)).round();
+        discounts.add(lineDiscount.clamp(0, line.subtotalMinor).toInt());
+        assigned += lineDiscount;
+      }
+    }
+    return discounts;
+  }
+
   CartDraft copyWith({
     List<CartDraftLine>? lines,
     String? paymentMethod,
     Object? amountPaidMinor = _unset,
+    int? discountMinor,
   }) {
     return CartDraft(
       lines: lines ?? this.lines,
@@ -157,6 +219,7 @@ class CartDraft {
       amountPaidMinor: amountPaidMinor == _unset
           ? this.amountPaidMinor
           : amountPaidMinor as int?,
+      discountMinor: discountMinor ?? this.discountMinor,
     );
   }
 }

@@ -45,7 +45,7 @@ class _DashboardContent extends StatelessWidget {
             width: 260,
             child: Image.asset(
               'assets/icon/stockmate_logo_lockup.png',
-              semanticLabel: 'Stockmate logo',
+              semanticLabel: 'EziTally logo',
               fit: BoxFit.contain,
             ),
           ),

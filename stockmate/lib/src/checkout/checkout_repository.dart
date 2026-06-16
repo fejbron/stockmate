@@ -247,6 +247,8 @@ class CheckoutRepository {
     if (amountPaidMinor == null) {
       return null;
     }
-    return amountPaidMinor - cart.totalMinor;
+    return (amountPaidMinor - cart.totalMinor)
+        .clamp(0, amountPaidMinor)
+        .toInt();
   }
 }

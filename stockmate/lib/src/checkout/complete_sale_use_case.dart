@@ -24,11 +24,6 @@ class CompleteSaleUseCase {
       );
     }
 
-    final amountPaidMinor = cart.amountPaidMinor;
-    if (amountPaidMinor != null && amountPaidMinor < cart.totalMinor) {
-      return const AppFailure('Amount paid is less than sale total.');
-    }
-
     final availableBatchesByProduct = <int, List<AvailableBatch>>{};
     final allocationsByLineIndex = <int, List<BatchAllocation>>{};
 

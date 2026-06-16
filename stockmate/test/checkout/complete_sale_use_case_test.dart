@@ -138,7 +138,7 @@ void main() {
     },
   );
 
-  test('returns failure without writing a sale when cash is short', () async {
+  test('records partial payment and consumes stock', () async {
     final productId = await db
         .into(db.products)
         .insert(ProductsCompanion.insert(name: 'Tea', sellingPriceMinor: 800));
@@ -169,9 +169,12 @@ void main() {
       ),
     );
 
-    expect(result.isSuccess, false);
-    expect(await db.select(db.sales).get(), isEmpty);
-    expect((await db.select(db.stockBatches).getSingle()).quantityRemaining, 2);
+    expect(result.isSuccess, true);
+    final sale = await db.select(db.sales).getSingle();
+    expect(sale.totalMinor, 800);
+    expect(sale.amountPaidMinor, 500);
+    expect(sale.changeDueMinor, 0);
+    expect((await db.select(db.stockBatches).getSingle()).quantityRemaining, 1);
   });
 
   test('returns failure without writing a sale when cart is empty', () async {

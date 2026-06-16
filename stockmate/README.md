@@ -1,4 +1,4 @@
-# stockmate
+# EziTally
 
 A new Flutter project.
 

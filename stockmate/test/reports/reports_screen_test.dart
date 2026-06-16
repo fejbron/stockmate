@@ -32,12 +32,12 @@ void main() {
     );
 
     expect(find.text('Revenue'), findsOneWidget);
-    expect(find.text('10.00'), findsWidgets);
+    expect(find.text('₵ 10.00'), findsWidgets);
     expect(find.text('Gross Profit'), findsOneWidget);
-    expect(find.text('4.00'), findsOneWidget);
+    expect(find.text('₵ 4.00'), findsOneWidget);
     expect(find.text('Top Products'), findsOneWidget);
     expect(find.text('Milk'), findsOneWidget);
     expect(find.text('Stock Value'), findsOneWidget);
-    expect(find.text('9.00'), findsOneWidget);
+    expect(find.text('₵ 9.00'), findsOneWidget);
   });
 }

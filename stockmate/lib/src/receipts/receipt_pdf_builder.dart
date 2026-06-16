@@ -39,7 +39,7 @@ class ReceiptPdfBuilder {
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
               pw.Text(
-                'Stockmate Receipt',
+                'EziTally Receipt',
                 style: pw.TextStyle(
                   fontSize: 18,
                   fontWeight: pw.FontWeight.bold,
