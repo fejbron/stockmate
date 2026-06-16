@@ -28,6 +28,9 @@ class AppRestarterState extends State<AppRestarter> {
   /// Restores [backup], reopening the database afterwards. Shows a snackbar
   /// with the outcome.
   Future<void> restoreFromFile(File backup) async {
+    if (_busy) {
+      return;
+    }
     final service = _container.read(backupServiceProvider);
 
     setState(() => _busy = true);
@@ -45,6 +48,9 @@ class AppRestarterState extends State<AppRestarter> {
     _container = ProviderContainer();
     old.dispose();
 
+    if (!mounted) {
+      return;
+    }
     setState(() => _busy = false);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
