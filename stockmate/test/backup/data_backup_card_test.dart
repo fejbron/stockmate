@@ -16,6 +16,15 @@ class _FakeBackupService implements BackupService {
       const BackupValidation.valid();
 }
 
+class _InvalidBackupService implements BackupService {
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+
+  @override
+  Future<BackupValidation> validateBackup(File file) async =>
+      const BackupValidation.invalid('This backup is missing required data.');
+}
+
 void main() {
   testWidgets('restore asks for confirmation before applying', (tester) async {
     final fakeFile = File('${Directory.systemTemp.path}/fake-backup.sqlite');
@@ -49,5 +58,33 @@ void main() {
     expect(pickCalled, isTrue);
     expect(find.text('Replace all current data?'), findsOneWidget);
     expect(find.text('Cancel'), findsOneWidget);
+  });
+
+  testWidgets('restore shows the validation error for an invalid file', (
+    tester,
+  ) async {
+    final fakeFile = File('${Directory.systemTemp.path}/fake-backup.sqlite');
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          backupServiceProvider.overrideWithValue(_InvalidBackupService()),
+        ],
+        child: MaterialApp(
+          home: Scaffold(
+            body: DataBackupCard(
+              pickFile: () async => fakeFile,
+              shareFile: (_) async {},
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Restore from file'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Replace all current data?'), findsNothing);
+    expect(find.text('This backup is missing required data.'), findsOneWidget);
   });
 }

@@ -73,7 +73,9 @@ class _DataBackupCardState extends ConsumerState<DataBackupCard> {
       final file = await service.createBackup(dir);
       await (widget.shareFile ?? _defaultShare)(file);
     } on Object catch (error) {
-      _showMessage('Backup failed: $error');
+      if (mounted) {
+        _showMessage('Backup failed: $error');
+      }
     } finally {
       if (mounted) {
         setState(() => _busy = false);
@@ -134,7 +136,11 @@ class _DataBackupCardState extends ConsumerState<DataBackupCard> {
 
   Future<File?> _defaultPick() async {
     final result = await FilePicker.platform.pickFiles();
-    final path = result?.files.single.path;
+    final files = result?.files;
+    if (files == null || files.isEmpty) {
+      return null;
+    }
+    final path = files.first.path;
     return path == null ? null : File(path);
   }
 
