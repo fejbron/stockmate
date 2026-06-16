@@ -120,7 +120,7 @@ class BackupService {
       await _deleteIfExists(File('${dbFile.path}-wal'));
       await _deleteIfExists(File('${dbFile.path}-shm'));
       await _deleteIfExists(bak);
-    } on Exception {
+    } catch (_) {
       if (await bak.exists()) {
         await bak.copy(dbFile.path);
         await _deleteIfExists(bak);

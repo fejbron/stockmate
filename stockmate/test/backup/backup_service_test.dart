@@ -77,4 +77,25 @@ void main() {
     expect(File('${dbFile.path}-wal').existsSync(), isFalse);
     expect(File('${dbFile.path}.bak').existsSync(), isFalse);
   });
+
+  test('restoreBackup rejects an invalid file without modifying the db',
+      () async {
+    await db
+        .into(db.products)
+        .insert(ProductsCompanion.insert(name: 'Milk', sellingPriceMinor: 500));
+    final junk = File(p.join(tempDir.path, 'not-a-backup.txt'));
+    await junk.writeAsString('nope');
+
+    await expectLater(
+      service.restoreBackup(junk),
+      throwsA(isA<BackupException>()),
+    );
+
+    // db must be untouched and still usable (not closed by a failed restore).
+    final names = (await db.select(db.products).get())
+        .map((row) => row.name)
+        .toList();
+    expect(names, ['Milk']);
+    expect(File('${dbFile.path}.bak').existsSync(), isFalse);
+  });
 }
