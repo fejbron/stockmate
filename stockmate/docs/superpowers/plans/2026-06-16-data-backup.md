@@ -810,8 +810,16 @@ class _DataBackupCardState extends ConsumerState<DataBackupCard> {
   }
 
   Future<void> _defaultShare(File file) async {
+    final box = context.findRenderObject() as RenderBox?;
+    final origin = box != null
+        ? box.localToGlobal(Offset.zero) & box.size
+        : null;
     await SharePlus.instance.share(
-      ShareParams(files: [XFile(file.path)], text: 'EziTally data backup'),
+      ShareParams(
+        files: [XFile(file.path)],
+        text: 'EziTally data backup',
+        sharePositionOrigin: origin,
+      ),
     );
   }
 
