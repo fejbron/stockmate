@@ -3,6 +3,10 @@ import 'package:go_router/go_router.dart';
 
 import 'router/app_router.dart';
 
+/// Used to show snackbars after the provider tree is rebuilt (e.g. restore).
+final GlobalKey<ScaffoldMessengerState> rootScaffoldMessengerKey =
+    GlobalKey<ScaffoldMessengerState>();
+
 class StockmateApp extends StatelessWidget {
   StockmateApp({GoRouter? router, super.key})
     : router = router ?? createAppRouter();
@@ -21,6 +25,7 @@ class StockmateApp extends StatelessWidget {
 
     return MaterialApp.router(
       title: 'EziTally',
+      scaffoldMessengerKey: rootScaffoldMessengerKey,
       theme: ThemeData(
         colorScheme: colorScheme,
         useMaterial3: true,
