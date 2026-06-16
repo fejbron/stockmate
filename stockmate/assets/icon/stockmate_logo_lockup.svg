@@ -1,0 +1,14 @@
+<svg width="1600" height="480" viewBox="0 0 1600 480" xmlns="http://www.w3.org/2000/svg">
+  <rect x="40" y="60" width="360" height="360" rx="80" fill="#159a73"/>
+  <g transform="translate(40,60) scale(0.351563) translate(-230.4,-230.4) scale(1.45)">
+    <polygon points="512,292 694,396 512,500 330,396" fill="#ffffff"/>
+    <polygon points="330,396 512,500 512,708 330,604" fill="#ffffff" fill-opacity="0.55"/>
+    <polygon points="512,500 694,396 694,604 512,708" fill="#ffffff" fill-opacity="0.78"/>
+    <line x1="512" y1="500" x2="330" y2="396" stroke="#159a73" stroke-width="7"/>
+    <line x1="512" y1="500" x2="694" y2="396" stroke="#159a73" stroke-width="7"/>
+    <line x1="512" y1="500" x2="512" y2="708" stroke="#159a73" stroke-width="7"/>
+    <polyline points="372,556 414,600 478,508" fill="none" stroke="#FFCB5C" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <text x="452" y="278" font-family="Inter, 'Helvetica Neue', Arial, sans-serif" font-size="150" font-weight="700"><tspan fill="#1f2937">Stock</tspan><tspan fill="#159a73">mate</tspan></text>
+  <text x="456" y="350" font-family="Inter, 'Helvetica Neue', Arial, sans-serif" font-size="46" fill="#5f6e69">Sales &#183; revenue &#183; inventory management</text>
+</svg>
