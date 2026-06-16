@@ -1,6 +1,8 @@
 import 'package:drift/drift.dart';
 import 'package:drift_flutter/drift_flutter.dart';
 
+import 'database_location.dart';
+
 part 'app_database.g.dart';
 
 class Products extends Table {
@@ -153,12 +155,17 @@ class AppDatabase extends _$AppDatabase {
     : super(
         driftDatabase(
           name: 'stockmate',
+          native: DriftNativeOptions(
+            databasePath: () async => (await resolveDatabaseFile()).path,
+          ),
           web: DriftWebOptions(
             sqlite3Wasm: Uri.parse('sqlite3.wasm'),
             driftWorker: Uri.parse('drift_worker.js'),
           ),
         ),
       );
+
+  bool _isClosed = false;
 
   @override
   int get schemaVersion => 1;
@@ -169,4 +176,13 @@ class AppDatabase extends _$AppDatabase {
       await customStatement('PRAGMA foreign_keys = ON');
     },
   );
+
+  @override
+  Future<void> close() async {
+    if (_isClosed) {
+      return;
+    }
+    _isClosed = true;
+    await super.close();
+  }
 }
