@@ -28,9 +28,11 @@
 
 Run:
 ```bash
-flutter pub add share_plus file_picker path_provider sqlite3 path
+flutter pub add "share_plus:^11.0.0" "file_picker:^8.0.0" path_provider sqlite3 path
 ```
 Expected: `pubspec.yaml` gains these under `dependencies:` and `flutter pub get` resolves successfully.
+
+`share_plus` and `file_picker` versions are pinned deliberately: unpinned, the latest `share_plus` (13.x) forces `win32 ^6`, which is incompatible with modern `file_picker` (needs `win32 ^5.9`) and silently backtracks `file_picker` to an ancient `3.0.4`. `share_plus ^11` keeps `win32` at `5.x`, allowing `file_picker ^8`. Expected resolution: `share_plus 11.1.0`, `file_picker 8.x`, `win32 5.15.0`. (`share_plus 11` uses the modern `SharePlus.instance.share(ShareParams(...))` API used in Task 5.)
 
 - [ ] **Step 2: Verify resolution**
 
@@ -818,11 +820,7 @@ class _DataBackupCardState extends ConsumerState<DataBackupCard> {
   }
 }
 ```
-Note on `share_plus` API: the code above targets `share_plus` v11+ (`SharePlus.instance.share(ShareParams(...))`). If `flutter pub add` resolved an older major (v7–v10), replace the body of `_defaultShare` with:
-```dart
-await Share.shareXFiles([XFile(file.path)], text: 'EziTally data backup');
-```
-Verify which API exists by opening the resolved package, and use the matching one.
+Note on `share_plus` API: Task 0 pins `share_plus ^11`, whose API is `SharePlus.instance.share(ShareParams(...))` (used above). If for any reason a different major resolved, verify the API in the resolved package before continuing.
 
 - [ ] **Step 4: Run the widget test to verify it passes**
 
