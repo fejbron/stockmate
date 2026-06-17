@@ -8,7 +8,7 @@
 # 3. Keep this file as flutter_launcher_icons.yaml and run the command above.
 
 flutter_launcher_icons:
-  image_path: "assets/icon/stockmate_icon_1024.png"
+  image_path: "assets/icon/ezitally_icon_1024.png"
 
   android: false
   ios: true

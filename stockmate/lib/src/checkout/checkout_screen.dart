@@ -13,7 +13,7 @@ typedef CheckoutCodeDetected = void Function(String code);
 typedef CheckoutScannerBuilder =
     Widget Function(BuildContext context, CheckoutCodeDetected onCodeDetected);
 
-const _orderAccent = Color(0xFFFF6237);
+const _orderAccent = Color(0xFF159A73);
 const _orderBackground = Color(0xFFEFF3F6);
 const _orderText = Color(0xFF111827);
 
@@ -204,7 +204,7 @@ class _ScanHeader extends StatelessWidget {
             fit: StackFit.expand,
             children: [
               Image.asset(
-                'assets/icon/stockmate_icon_1024.png',
+                'assets/icon/ezitally_icon_1024.png',
                 fit: BoxFit.cover,
                 opacity: const AlwaysStoppedAnimation(0.16),
               ),
@@ -522,7 +522,7 @@ class _OrderLineTile extends ConsumerWidget {
             width: 54,
             height: 54,
             decoration: BoxDecoration(
-              color: const Color(0xFFFFF1EC),
+              color: const Color(0xFFE6F4EF),
               borderRadius: BorderRadius.circular(18),
             ),
             child: Icon(Icons.inventory_2, color: _orderAccent),
@@ -603,7 +603,7 @@ class _QuantityButton extends StatelessWidget {
         icon: Icon(icon, size: 18),
         style: IconButton.styleFrom(
           backgroundColor: _orderAccent,
-          disabledBackgroundColor: const Color(0xFFFFD4C8),
+          disabledBackgroundColor: const Color(0xFFA9D9CA),
           foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),

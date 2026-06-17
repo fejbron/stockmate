@@ -16,8 +16,8 @@ class StockmateApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = ColorScheme.fromSeed(
-      seedColor: const Color(0xFFFF6237),
-      primary: const Color(0xFFFF6237),
+      seedColor: const Color(0xFF159A73),
+      primary: const Color(0xFF159A73),
       secondary: const Color(0xFF16A34A),
       tertiary: const Color(0xFF2563EB),
       surface: const Color(0xFFEFF3F6),
@@ -60,7 +60,7 @@ class StockmateApp extends StatelessWidget {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(18),
-            borderSide: const BorderSide(color: Color(0xFFFF6237), width: 1.5),
+            borderSide: const BorderSide(color: Color(0xFF159A73), width: 1.5),
           ),
         ),
         filledButtonTheme: FilledButtonThemeData(
@@ -92,7 +92,7 @@ class StockmateApp extends StatelessWidget {
           labelTextStyle: WidgetStateProperty.resolveWith((states) {
             if (states.contains(WidgetState.selected)) {
               return const TextStyle(
-                color: Color(0xFFFF6237),
+                color: Color(0xFF159A73),
                 fontWeight: FontWeight.w800,
               );
             }
