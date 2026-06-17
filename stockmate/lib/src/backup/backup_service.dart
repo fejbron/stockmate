@@ -34,6 +34,11 @@ class BackupService {
   final AppDatabase database;
   final Future<File> Function() resolveDatabaseFile;
 
+  /// Test seam: invoked during the post-write, best-effort cleanup phase of
+  /// [restoreBackup] to simulate a cleanup failure. Production code leaves this
+  /// null.
+  Future<void> Function()? debugAfterWriteCleanup;
+
   static const List<String> _requiredTables = ['products', 'sales'];
 
   /// Creates a timestamped copy of the database in [destination].
@@ -115,17 +120,34 @@ class BackupService {
 
     await database.close();
 
+    // Phase 1 (transactional): drop the OLD database's WAL/SHM sidecars before
+    // writing, so the new file is never opened alongside a stale WAL, then
+    // write the new bytes. Any failure here means the restore did not commit,
+    // so roll back from the `.bak` sidecar.
     try {
-      await dbFile.writeAsBytes(backupBytes, flush: true);
       await _deleteIfExists(File('${dbFile.path}-wal'));
       await _deleteIfExists(File('${dbFile.path}-shm'));
-      await _deleteIfExists(bak);
+      await dbFile.writeAsBytes(backupBytes, flush: true);
     } catch (_) {
       if (await bak.exists()) {
         await bak.copy(dbFile.path);
         await _deleteIfExists(bak);
       }
       rethrow;
+    }
+
+    // Phase 2 (best-effort cleanup): the restore has COMMITTED. Removing the
+    // `.bak` sidecar is housekeeping only — its failure must never clobber the
+    // freshly restored data, so swallow any error here.
+    try {
+      final hook = debugAfterWriteCleanup;
+      if (hook != null) {
+        await hook();
+      }
+      await _deleteIfExists(bak);
+    } catch (_) {
+      // Restored data is already in place; leaving a stale `.bak` behind is
+      // harmless and far preferable to overwriting good data.
     }
   }
 

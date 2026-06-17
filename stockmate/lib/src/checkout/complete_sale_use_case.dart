@@ -24,78 +24,23 @@ class CompleteSaleUseCase {
       );
     }
 
-    final availableBatchesByProduct = <int, List<AvailableBatch>>{};
-    final allocationsByLineIndex = <int, List<BatchAllocation>>{};
-
-    for (var index = 0; index < cart.lines.length; index += 1) {
-      final line = cart.lines[index];
-      final batches = await _availableBatchesForLine(
-        line.productId,
-        availableBatchesByProduct,
+    // Allocation is recomputed authoritatively inside persistSale, within the
+    // same DB transaction, so it is atomic against concurrent stock changes.
+    // Any DB failure (constraint violation, receipt collision, or an
+    // insufficient-stock shortfall detected at commit time) is converted into
+    // a clean AppFailure and never escapes as a throw.
+    try {
+      final saleId = await repository.persistSale(
+        cart: cart,
+        allocator: allocator,
       );
-      final allocationResult = allocator.allocate(
-        requestedQuantity: line.quantity,
-        batches: batches,
-      );
-      if (!allocationResult.isSuccess) {
-        return AppFailure(allocationResult.message);
-      }
-      allocationsByLineIndex[index] = allocationResult.allocations;
-      _consumeAllocatedBatches(
-        productId: line.productId,
-        allocations: allocationResult.allocations,
-        availableBatchesByProduct: availableBatchesByProduct,
+      return AppSuccess(CompleteSaleResult(saleId));
+    } on InsufficientStockException catch (error) {
+      return AppFailure(error.message);
+    } catch (_) {
+      return const AppFailure(
+        'Could not record sale. Please try again.',
       );
     }
-
-    final saleId = await repository.persistSale(
-      cart: cart,
-      allocationsByLineIndex: allocationsByLineIndex,
-    );
-    return AppSuccess(CompleteSaleResult(saleId));
-  }
-
-  Future<List<AvailableBatch>> _availableBatchesForLine(
-    int productId,
-    Map<int, List<AvailableBatch>> availableBatchesByProduct,
-  ) async {
-    final cached = availableBatchesByProduct[productId];
-    if (cached != null) {
-      return cached;
-    }
-
-    final batches = await repository.availableBatches(productId);
-    availableBatchesByProduct[productId] = batches;
-    return batches;
-  }
-
-  void _consumeAllocatedBatches({
-    required int productId,
-    required List<BatchAllocation> allocations,
-    required Map<int, List<AvailableBatch>> availableBatchesByProduct,
-  }) {
-    final batches = availableBatchesByProduct[productId] ?? const [];
-    final updatedBatches = <AvailableBatch>[];
-
-    for (final batch in batches) {
-      var quantityRemaining = batch.quantityRemaining;
-      for (final allocation in allocations) {
-        if (allocation.stockBatchId == batch.id) {
-          quantityRemaining -= allocation.quantity;
-        }
-      }
-
-      if (quantityRemaining > 0) {
-        updatedBatches.add(
-          AvailableBatch(
-            id: batch.id,
-            quantityRemaining: quantityRemaining,
-            costPerUnitMinor: batch.costPerUnitMinor,
-          ),
-        );
-      }
-    }
-
-    availableBatchesByProduct[productId] = updatedBatches;
   }
 }

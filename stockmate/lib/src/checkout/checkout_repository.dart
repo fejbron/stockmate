@@ -4,6 +4,18 @@ import '../data/app_database.dart';
 import 'cart_models.dart';
 import 'stock_allocator.dart';
 
+/// Thrown inside [CheckoutRepository.persistSale] when stock is insufficient
+/// at commit time. The transaction rolls back; callers convert this into a
+/// clean failure result rather than letting it escape.
+class InsufficientStockException implements Exception {
+  const InsufficientStockException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => 'InsufficientStockException: $message';
+}
+
 class SellableProduct {
   const SellableProduct({
     required this.id,
@@ -143,19 +155,55 @@ class CheckoutRepository {
     ];
   }
 
+  /// Persists a sale atomically.
+  ///
+  /// Stock allocation is recomputed INSIDE the transaction against freshly
+  /// read batch quantities, so concurrent sales (or a sale racing a stock
+  /// adjustment) cannot oversell. If stock is insufficient at commit time an
+  /// [InsufficientStockException] is thrown so the caller can surface a clean
+  /// failure; the transaction rolls back and no partial sale is written.
   Future<int> persistSale({
     required Cart cart,
-    required Map<int, List<BatchAllocation>> allocationsByLineIndex,
+    required StockAllocator allocator,
   }) {
     return db.transaction(() async {
-      final receiptNumber = 'R-${DateTime.now().microsecondsSinceEpoch}';
+      // Authoritatively allocate against the current on-disk stock, tracking
+      // running consumption so duplicate product lines do not double-spend.
+      final availableBatchesByProduct = <int, List<AvailableBatch>>{};
+      final allocationsByLineIndex = <int, List<BatchAllocation>>{};
+
+      for (var index = 0; index < cart.lines.length; index += 1) {
+        final line = cart.lines[index];
+        final batches = await _availableBatchesInTransaction(
+          line.productId,
+          availableBatchesByProduct,
+        );
+        final allocationResult = allocator.allocate(
+          requestedQuantity: line.quantity,
+          batches: batches,
+        );
+        if (!allocationResult.isSuccess) {
+          throw InsufficientStockException(allocationResult.message);
+        }
+        allocationsByLineIndex[index] = allocationResult.allocations;
+        availableBatchesByProduct[line.productId] = _consumeAllocatedBatches(
+          batches: batches,
+          allocations: allocationResult.allocations,
+        );
+      }
+
       final costTotalMinor = _costTotalMinor(allocationsByLineIndex);
 
+      _pendingReceiptCounter += 1;
       final saleId = await db
           .into(db.sales)
           .insert(
             SalesCompanion.insert(
-              receiptNumber: receiptNumber,
+              // Temporary placeholder; replaced below with a value derived from
+              // the auto-increment sale id so it is collision-free. The counter
+              // keeps the placeholder unique against the UNIQUE constraint even
+              // for back-to-back sales before each receives its id.
+              receiptNumber: 'R-pending-$_pendingReceiptCounter',
               subtotalMinor: cart.subtotalMinor,
               discountTotalMinor: Value(cart.discountTotalMinor),
               totalMinor: cart.totalMinor,
@@ -166,6 +214,14 @@ class CheckoutRepository {
               changeDueMinor: Value(_changeDueMinor(cart)),
             ),
           );
+
+      // Derive a unique receipt number from the auto-increment sale id.
+      final receiptNumber = 'R-$saleId';
+      await (db.update(
+        db.sales,
+      )..where((row) => row.id.equals(saleId))).write(
+        SalesCompanion(receiptNumber: Value(receiptNumber)),
+      );
 
       for (var index = 0; index < cart.lines.length; index += 1) {
         final line = cart.lines[index];
@@ -230,6 +286,49 @@ class CheckoutRepository {
 
       return saleId;
     });
+  }
+
+  // Monotonic counter making the in-transaction placeholder receipt number
+  // unique even before the sale id is known, avoiding the UNIQUE collision
+  // that two concurrent transactions could otherwise hit.
+  int _pendingReceiptCounter = 0;
+
+  Future<List<AvailableBatch>> _availableBatchesInTransaction(
+    int productId,
+    Map<int, List<AvailableBatch>> availableBatchesByProduct,
+  ) async {
+    final cached = availableBatchesByProduct[productId];
+    if (cached != null) {
+      return cached;
+    }
+    final batches = await availableBatches(productId);
+    availableBatchesByProduct[productId] = batches;
+    return batches;
+  }
+
+  List<AvailableBatch> _consumeAllocatedBatches({
+    required List<AvailableBatch> batches,
+    required List<BatchAllocation> allocations,
+  }) {
+    final updatedBatches = <AvailableBatch>[];
+    for (final batch in batches) {
+      var quantityRemaining = batch.quantityRemaining;
+      for (final allocation in allocations) {
+        if (allocation.stockBatchId == batch.id) {
+          quantityRemaining -= allocation.quantity;
+        }
+      }
+      if (quantityRemaining > 0) {
+        updatedBatches.add(
+          AvailableBatch(
+            id: batch.id,
+            quantityRemaining: quantityRemaining,
+            costPerUnitMinor: batch.costPerUnitMinor,
+          ),
+        );
+      }
+    }
+    return updatedBatches;
   }
 
   int _costTotalMinor(Map<int, List<BatchAllocation>> allocationsByLineIndex) {

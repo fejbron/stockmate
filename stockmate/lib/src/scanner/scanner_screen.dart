@@ -15,11 +15,15 @@ import '../shared/money.dart';
 import 'manual_code_entry.dart';
 
 class ScannerScreen extends ConsumerStatefulWidget {
-  const ScannerScreen({this.controller, super.key});
+  const ScannerScreen({this.controller, this.now, super.key});
 
   /// Optional injected controller, primarily for tests. When null, the screen
   /// owns its own [MobileScannerController].
   final MobileScannerController? controller;
+
+  /// Optional clock, primarily for tests, used by the duplicate-scan debounce.
+  /// Defaults to [DateTime.now] in production.
+  final DateTime Function()? now;
 
   @override
   ConsumerState<ScannerScreen> createState() => _ScannerScreenState();
@@ -27,8 +31,16 @@ class ScannerScreen extends ConsumerStatefulWidget {
 
 class _ScannerScreenState extends ConsumerState<ScannerScreen> {
   String? lastCode;
+  DateTime? lastScannedAt;
   SellableProduct? matchedProduct;
   bool isLookingUp = false;
+
+  /// Window during which an identical code is treated as a duplicate of a
+  /// single physical scan and ignored. After it elapses the same code can be
+  /// scanned again. Mirrors the checkout screen's debounce.
+  static const _duplicateScanWindow = Duration(milliseconds: 1200);
+
+  DateTime _now() => (widget.now ?? DateTime.now)();
 
   late final MobileScannerController _scannerController =
       widget.controller ?? MobileScannerController();
@@ -97,8 +109,20 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
       return;
     }
 
+    // Time-window debounce: ignore the same code only if it was scanned within
+    // the window (collapses rapid duplicate detections from one physical scan),
+    // but allow it through again once the window elapses.
+    final now = _now();
+    final lastAt = lastScannedAt;
+    if (trimmedCode == lastCode &&
+        lastAt != null &&
+        now.difference(lastAt) < _duplicateScanWindow) {
+      return;
+    }
+
     setState(() {
       lastCode = trimmedCode;
+      lastScannedAt = now;
       matchedProduct = null;
       isLookingUp = true;
     });
@@ -148,7 +172,9 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
               ),
               onDetect: (capture) {
                 final detected = capture.barcodes.firstOrNull?.rawValue;
-                if (detected != null && detected.trim() != lastCode) {
+                if (detected != null) {
+                  // _handleCode owns the duplicate-scan debounce (time window),
+                  // so the same code can be re-scanned after a short delay.
                   _handleCode(detected);
                 }
               },

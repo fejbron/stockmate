@@ -78,6 +78,39 @@ void main() {
     expect(File('${dbFile.path}.bak').existsSync(), isFalse);
   });
 
+  test('restoreBackup keeps restored data when post-write cleanup fails',
+      () async {
+    await db
+        .into(db.products)
+        .insert(ProductsCompanion.insert(name: 'Milk', sellingPriceMinor: 500));
+    final backup = await service.createBackup(tempDir);
+    final backupBytes = await backup.readAsBytes();
+
+    // Mutate after the backup was taken so the pre-restore db differs from it.
+    await db
+        .into(db.products)
+        .insert(ProductsCompanion.insert(name: 'Sugar', sellingPriceMinor: 300));
+
+    // Force the post-write best-effort cleanup step to throw. A genuine
+    // restore (the writeAsBytes) has already succeeded at this point, so the
+    // cleanup failure must NOT roll back to the stale pre-restore db.
+    service.debugAfterWriteCleanup = () async {
+      throw const FileSystemException('simulated cleanup failure');
+    };
+
+    await service.restoreBackup(backup);
+
+    // The freshly restored bytes must survive untouched by the cleanup failure.
+    expect(await dbFile.readAsBytes(), backupBytes);
+
+    final reopened = AppDatabase(NativeDatabase(dbFile));
+    final names = (await reopened.select(reopened.products).get())
+        .map((row) => row.name)
+        .toList();
+    await reopened.close();
+    expect(names, ['Milk']);
+  });
+
   test('restoreBackup rejects an invalid file without modifying the db',
       () async {
     await db

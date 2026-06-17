@@ -6,6 +6,7 @@ import 'package:stockmate/src/checkout/checkout_repository.dart';
 import 'package:stockmate/src/checkout/complete_sale_use_case.dart';
 import 'package:stockmate/src/checkout/stock_allocator.dart';
 import 'package:stockmate/src/data/app_database.dart';
+import 'package:stockmate/src/shared/result.dart';
 
 void main() {
   late AppDatabase db;
@@ -185,4 +186,60 @@ void main() {
     expect(result.isSuccess, false);
     expect(await db.select(db.sales).get(), isEmpty);
   });
+
+  test(
+    'does not oversell when two sales race for the same single unit of stock',
+    () async {
+      final productId = await db
+          .into(db.products)
+          .insert(
+            ProductsCompanion.insert(name: 'Sugar', sellingPriceMinor: 500),
+          );
+      await db
+          .into(db.stockBatches)
+          .insert(
+            StockBatchesCompanion.insert(
+              productId: productId,
+              quantityReceived: 1,
+              quantityRemaining: 1,
+              costPerUnitMinor: 200,
+            ),
+          );
+
+      Cart buildCart() => Cart(
+        lines: [
+          CartLine(
+            productId: productId,
+            name: 'Sugar',
+            quantity: 1,
+            unitPriceMinor: 500,
+            discountMinor: 0,
+          ),
+        ],
+        paymentMethod: 'cash',
+        amountPaidMinor: 500,
+      );
+
+      // Both sales read the same remaining quantity before either persists.
+      // Exactly one must succeed; the other must return a clean AppFailure
+      // (never throw, never oversell past the CHECK(quantity_remaining >= 0)).
+      late List<AppResult<CompleteSaleResult>> results;
+      await expectLater(() async {
+        results = await Future.wait([
+          useCase.completeSale(cart: buildCart()),
+          useCase.completeSale(cart: buildCart()),
+        ]);
+      }(), completes);
+
+      final successes = results.where((r) => r.isSuccess).length;
+      final failures = results.where((r) => !r.isSuccess).length;
+      expect(successes, 1);
+      expect(failures, 1);
+
+      final batch = await db.select(db.stockBatches).getSingle();
+      expect(batch.quantityRemaining, 0);
+      final sales = await db.select(db.sales).get();
+      expect(sales.length, 1);
+    },
+  );
 }

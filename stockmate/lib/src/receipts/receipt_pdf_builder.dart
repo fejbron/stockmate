@@ -3,6 +3,8 @@ import 'dart:typed_data';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
+import '../shared/money.dart';
+
 class ReceiptLine {
   const ReceiptLine({
     required this.name,
@@ -76,5 +78,9 @@ class ReceiptPdfBuilder {
     return doc.save();
   }
 
-  String _money(int minor) => (minor / 100).toStringAsFixed(2);
+  String _money(int minor) => formatMinor(minor);
+
+  /// Formats minor units the same way as the rest of the app ([Money.format]),
+  /// including thousands grouping, so receipts match on-screen totals.
+  static String formatMinor(int minor) => Money(minor).format();
 }

@@ -94,6 +94,61 @@ void main() {
     expect(find.text('Link to Existing Product'), findsOneWidget);
   });
 
+  testWidgets(
+    'same code is deduped within the debounce window but allowed after it',
+    (tester) async {
+      // A controllable clock so we can advance past the debounce window
+      // deterministically instead of relying on real wall-clock time.
+      var fakeNow = DateTime(2026, 1, 1, 12);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [databaseProvider.overrideWithValue(db)],
+          child: MaterialApp(home: ScannerScreen(now: () => fakeNow)),
+        ),
+      );
+
+      Future<void> scan(String code) async {
+        await tester.enterText(find.byType(TextField), code);
+        await tester.tap(find.text('Use Code'));
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+
+      // First scan: a result snackbar appears.
+      await scan('DUP-1');
+      expect(
+        find.text('No product found for DUP-1'),
+        findsOneWidget,
+        reason: 'first scan should be processed',
+      );
+
+      // Dismiss the snackbar so we can detect a fresh one later.
+      ScaffoldMessenger.of(
+        tester.element(find.byType(ScannerScreen)),
+      ).removeCurrentSnackBar();
+      await tester.pump();
+      expect(find.text('No product found for DUP-1'), findsNothing);
+
+      // Rapid duplicate (clock barely moved): must be ignored, no new snackbar.
+      fakeNow = fakeNow.add(const Duration(milliseconds: 200));
+      await scan('DUP-1');
+      expect(
+        find.text('No product found for DUP-1'),
+        findsNothing,
+        reason: 'a rapid duplicate within the debounce window must be ignored',
+      );
+
+      // Window elapsed: the SAME code must be processed again.
+      fakeNow = fakeNow.add(const Duration(milliseconds: 1200));
+      await scan('DUP-1');
+      expect(
+        find.text('No product found for DUP-1'),
+        findsOneWidget,
+        reason: 'the same code must be re-scannable after the debounce window',
+      );
+    },
+  );
+
   testWidgets('camera fallback explains manual entry', (tester) async {
     await tester.pumpWidget(
       const MaterialApp(home: Scaffold(body: ScannerCameraFallback())),

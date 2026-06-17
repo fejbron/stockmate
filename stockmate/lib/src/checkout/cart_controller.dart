@@ -42,12 +42,15 @@ class CheckoutCartController extends Notifier<CartDraft> {
   }
 }
 
+enum DiscountMode { none, percent, absolute }
+
 class CartDraft {
   const CartDraft({
     required this.lines,
     required this.paymentMethod,
     required this.amountPaidMinor,
-    required this.discountMinor,
+    this.discountMode = DiscountMode.none,
+    this.discountValue = 0,
   });
 
   factory CartDraft.empty() {
@@ -55,14 +58,22 @@ class CartDraft {
       lines: [],
       paymentMethod: 'cash',
       amountPaidMinor: null,
-      discountMinor: 0,
+      discountMode: DiscountMode.none,
+      discountValue: 0,
     );
   }
 
   final List<CartDraftLine> lines;
   final String paymentMethod;
   final int? amountPaidMinor;
-  final int discountMinor;
+
+  /// How the discount should be interpreted.
+  final DiscountMode discountMode;
+
+  /// The raw discount value: a percent (0-100) when [discountMode] is
+  /// [DiscountMode.percent], or an absolute amount in minor units when
+  /// [discountMode] is [DiscountMode.absolute]. Ignored for [DiscountMode.none].
+  final num discountValue;
 
   bool get isEmpty => lines.isEmpty;
 
@@ -74,7 +85,18 @@ class CartDraft {
     return total;
   }
 
-  int get discountTotalMinor => discountMinor.clamp(0, subtotalMinor).toInt();
+  int get discountTotalMinor {
+    switch (discountMode) {
+      case DiscountMode.none:
+        return 0;
+      case DiscountMode.percent:
+        final percent = discountValue.clamp(0, 100);
+        final discount = (subtotalMinor * (percent / 100)).round();
+        return discount.clamp(0, subtotalMinor).toInt();
+      case DiscountMode.absolute:
+        return discountValue.toInt().clamp(0, subtotalMinor).toInt();
+    }
+  }
 
   int get totalMinor => subtotalMinor - discountTotalMinor;
 
@@ -90,11 +112,17 @@ class CartDraft {
     for (final line in lines) {
       if (line.productId == product.id) {
         found = true;
-        updatedLines.add(
-          line.copyWith(
-            quantity: (line.quantity + 1).clamp(1, line.stockQuantity),
-          ),
-        );
+        if (line.stockQuantity > 0) {
+          updatedLines.add(
+            line.copyWith(
+              quantity: (line.quantity + 1).clamp(1, line.stockQuantity),
+            ),
+          );
+        } else {
+          // No stock available: leave the existing line unchanged rather than
+          // calling clamp(1, 0), which would throw.
+          updatedLines.add(line);
+        }
       } else {
         updatedLines.add(line);
       }
@@ -142,30 +170,55 @@ class CartDraft {
   }
 
   CartDraft setAmountPaid(String value) {
-    return copyWith(
-      amountPaidMinor: value.trim().isEmpty
-          ? null
-          : Money.fromDecimal(value).minorUnits,
-    );
+    if (value.trim().isEmpty) {
+      return copyWith(amountPaidMinor: null);
+    }
+    try {
+      return copyWith(amountPaidMinor: Money.fromDecimal(value).minorUnits);
+    } on FormatException {
+      // Malformed input: leave the amount paid unchanged.
+      return this;
+    }
   }
 
   CartDraft setDiscountAmount(String value) {
     final trimmed = value.trim();
-    final discount = trimmed.isEmpty
-        ? 0
-        : Money.fromDecimal(trimmed).minorUnits;
-    return copyWith(discountMinor: discount.clamp(0, subtotalMinor).toInt());
+    if (trimmed.isEmpty) {
+      return copyWith(
+        discountMode: DiscountMode.none,
+        discountValue: 0,
+      );
+    }
+    try {
+      final amount = Money.fromDecimal(trimmed).minorUnits;
+      return copyWith(
+        discountMode: DiscountMode.absolute,
+        discountValue: amount,
+      );
+    } on FormatException {
+      // Malformed input: leave the discount unchanged.
+      return this;
+    }
   }
 
   CartDraft setDiscountPercent(String value) {
     final trimmed = value.trim();
     if (trimmed.isEmpty) {
-      return copyWith(discountMinor: 0);
+      return copyWith(
+        discountMode: DiscountMode.none,
+        discountValue: 0,
+      );
     }
 
-    final percent = double.parse(trimmed).clamp(0, 100);
-    final discount = (subtotalMinor * (percent / 100)).round();
-    return copyWith(discountMinor: discount.clamp(0, subtotalMinor).toInt());
+    final percent = double.tryParse(trimmed);
+    if (percent == null) {
+      // Malformed input: leave the discount unchanged.
+      return this;
+    }
+    return copyWith(
+      discountMode: DiscountMode.percent,
+      discountValue: percent.clamp(0, 100),
+    );
   }
 
   Cart toCart() {
@@ -196,11 +249,20 @@ class CartDraft {
     for (var index = 0; index < lines.length; index += 1) {
       final line = lines[index];
       if (index == lines.length - 1) {
-        discounts.add(discountTotalMinor - assigned);
+        // Last line bears the rounding remainder, clamped so it can never go
+        // negative or exceed this line's subtotal.
+        final remainder = (discountTotalMinor - assigned)
+            .clamp(0, line.subtotalMinor)
+            .toInt();
+        discounts.add(remainder);
       } else {
-        final lineDiscount =
-            (discountTotalMinor * (line.subtotalMinor / subtotalMinor)).round();
-        discounts.add(lineDiscount.clamp(0, line.subtotalMinor).toInt());
+        final lineDiscount = (discountTotalMinor *
+                (line.subtotalMinor / subtotalMinor))
+            .round()
+            .clamp(0, line.subtotalMinor)
+            .toInt();
+        discounts.add(lineDiscount);
+        // Accumulate the CLAMPED value so the remainder stays consistent.
         assigned += lineDiscount;
       }
     }
@@ -211,7 +273,8 @@ class CartDraft {
     List<CartDraftLine>? lines,
     String? paymentMethod,
     Object? amountPaidMinor = _unset,
-    int? discountMinor,
+    DiscountMode? discountMode,
+    num? discountValue,
   }) {
     return CartDraft(
       lines: lines ?? this.lines,
@@ -219,7 +282,8 @@ class CartDraft {
       amountPaidMinor: amountPaidMinor == _unset
           ? this.amountPaidMinor
           : amountPaidMinor as int?,
-      discountMinor: discountMinor ?? this.discountMinor,
+      discountMode: discountMode ?? this.discountMode,
+      discountValue: discountValue ?? this.discountValue,
     );
   }
 }

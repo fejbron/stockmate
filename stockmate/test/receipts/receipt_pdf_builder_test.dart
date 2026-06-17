@@ -24,4 +24,11 @@ void main() {
 
     expect(bytes.length, greaterThan(500));
   });
+
+  test('formats money with thousands grouping like the rest of the app', () {
+    // Receipts must match Money.format() used everywhere else (grouped),
+    // not bare toStringAsFixed which omits the thousands separator.
+    expect(ReceiptPdfBuilder.formatMinor(123456789), '1,234,567.89');
+    expect(ReceiptPdfBuilder.formatMinor(900), '9.00');
+  });
 }
