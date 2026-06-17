@@ -26,6 +26,8 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>EziTally uses the camera to scan product barcodes and QR codes.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>EziTally needs access to your photos and files so you can select a backup file to import or restore your data.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
